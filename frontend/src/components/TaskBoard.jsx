@@ -12,7 +12,7 @@ const progressFromWorkload = (workload) => {
   return value;
 };
 
-const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete }) => {
+const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete, onAddMember, onRemoveMember }) => {
   const visibleBuckets = useMemo(() => {
     if (priorityFilter === 'All') {
       return buckets;
@@ -56,7 +56,16 @@ const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete }) 
               <div className="bucket-lines">
                 {bucket.team.map((member) => (
                   <div key={`${bucket.id}-${member.name}`} className="bucket-line">
-                    <span>{member.name}</span>
+                    <span>
+                      {member.name}
+                      <button
+                        type="button"
+                        className="mini-icon-button"
+                        onClick={() => onRemoveMember(bucket, member)}
+                      >
+                        ✖️
+                      </button>
+                    </span>
                     <div className="bucket-progress-wrap">
                       <div className="bucket-progress-track">
                         <div
@@ -70,9 +79,14 @@ const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete }) 
                 ))}
               </div>
 
-              <button type="button" className="secondary-button" onClick={() => onMarkComplete(bucket.id)}>
-                Mark Complete
-              </button>
+              <div className="card-actions">
+                <button type="button" className="secondary-button" onClick={() => onAddMember(bucket)}>
+                  ➕ Add Member
+                </button>
+                <button type="button" className="secondary-button" onClick={() => onMarkComplete(bucket.id)}>
+                  ✅ Mark Complete
+                </button>
+              </div>
             </div>
           ))
         ) : (

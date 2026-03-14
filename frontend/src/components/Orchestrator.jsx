@@ -16,6 +16,10 @@ const Orchestrator = ({
   onTeamSizeChange,
   plan,
   assignedTeam,
+  teamConflicts,
+  conflictsResolved,
+  onAcceptConflicts,
+  onFindOthers,
   teamConfirmed,
   onConfirmTeam,
   onSendAssignments,
@@ -102,7 +106,7 @@ const Orchestrator = ({
         <div className="section-header compact">
           <div>
             <p className="section-title">👥 Suggested Team — {assignedTeam.length} Members</p>
-            <p className="section-subtitle">Karthik is pinned first by rule.</p>
+            <p className="section-subtitle">Akshaya is pinned first by rule.</p>
           </div>
         </div>
 
@@ -112,7 +116,7 @@ const Orchestrator = ({
               <div key={member.name} className="suggested-team-row">
                 <div>
                   <p className="employee-name">
-                    {index === 0 && member.name === 'G. Karthikeyan' ? '★ ' : ''}
+                    {index === 0 && member.name === 'Akshaya Nuthalapati' ? '★ ' : ''}
                     {member.name}
                   </p>
                   <p className="employee-role">{member.role}</p>
@@ -133,12 +137,39 @@ const Orchestrator = ({
             <button type="button" className="secondary-button" onClick={onReshuffle}>
               ↺ Reshuffle Team
             </button>
-            <button type="button" className="primary-button" onClick={onConfirmTeam}>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={onConfirmTeam}
+              disabled={Boolean(teamConflicts.length) && !conflictsResolved}
+            >
               ✅ Confirm OK
             </button>
           </div>
         ) : null}
       </div>
+
+      {teamConflicts.length && !conflictsResolved ? (
+        <div className="card warning-card">
+          <p className="section-title">⚠️ Conflict Detected</p>
+          <p className="section-subtitle">The following members are already assigned to active projects:</p>
+          <div className="chip-row dense">
+            {teamConflicts.map((item) => (
+              <span key={`${item.name}-${item.project_name}`} className="chip amber">
+                {item.name} — {item.project_name}
+              </span>
+            ))}
+          </div>
+          <div className="card-actions">
+            <button type="button" className="primary-button" onClick={onAcceptConflicts}>
+              ✅ Yes, Add Them
+            </button>
+            <button type="button" className="secondary-button" onClick={onFindOthers}>
+              🔄 Find Others
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {teamConfirmed ? (
         <div className="card">

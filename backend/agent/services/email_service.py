@@ -1,157 +1,221 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from email.message import EmailMessage as MimeEmailMessage
+import os
 import smtplib
-import ssl
+from datetime import datetime, timedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Any
 
-import certifi
-from django.conf import settings
+SPECIAL_RECIPIENT_OVERRIDES = {
+    "akshaya nuthalapati": "aksh.ayanuthalapati.0523@gmail.com",
+    "akshaya": "aksh.ayanuthalapati.0523@gmail.com",
+}
 
 
-@dataclass
-class EmailResult:
-    email: str
-    status: str
-    error: str | None = None
-
-
-def _priority_badge(priority: str) -> str:
-    normalized = str(priority or "").strip().lower()
-    if normalized == "high":
-        return "🔴 High"
-    if normalized == "medium":
-        return "🟡 Medium"
-    return "🟢 Low"
-
-
-def _first_name(name: str) -> str:
-    cleaned = str(name or "").strip()
-    if not cleaned:
-        return "Teammate"
-    return cleaned.split(" ")[0].replace(".", "")
-
-
-def _build_team_lines(team: list[dict[str, Any]]) -> str:
-    return "\n".join(
-        f"   • {member.get('name', 'Unknown')} — {member.get('role', 'Contributor')}"
-        for member in team
-    )
-
-
-def _build_task_lines(tasks: list[dict[str, Any]]) -> str:
-    if not tasks:
-        return "   • Task details are available in Neurax Dashboard"
-    return "\n".join(
-        f"   • {task.get('name', 'Task')}: {task.get('description', '')} — {task.get('duration', 1)} days"
-        for task in tasks
-    )
-
-
-def compose_assignment_email(payload: dict[str, Any], recipient: dict[str, Any]) -> tuple[str, str]:
-    project_name = payload.get("project_name", "Neurax Project")
-    priority_badge = _priority_badge(payload.get("priority", "Low"))
-    deadline_days = int(payload.get("deadline_days", 1))
-    deadline_date = payload.get("deadline_date") or (datetime.utcnow() + timedelta(days=deadline_days)).strftime("%d %b %Y")
-
-    subject = f"🚀 Project Assignment — {project_name} | Neurax Taskifier"
-
-    body = (
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "        NEURAX TASK ASSIGNMENT\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"Hi {_first_name(recipient.get('name', 'Teammate'))},\n\n"
-        "You have been officially assigned to a new project.\n"
-        "Here are your full assignment details:\n\n"
-        "📌 PROJECT\n"
-        f"   Name     : {project_name}\n"
-        f"   Priority : {priority_badge}\n"
-        f"   Deadline : {deadline_days} days from today ({deadline_date})\n\n"
-        "👥 YOUR TEAM\n"
-        "   You will be working alongside:\n"
-        f"{_build_team_lines(payload.get('team', []))}\n\n"
-        "📋 YOUR TASKS\n"
-        f"{_build_task_lines(payload.get('tasks', []))}\n\n"
-        "⚠️  IMPORTANT\n"
-        "   Please ensure all deliverables are submitted\n"
-        "   before the deadline. Late submissions will\n"
-        "   trigger automatic task reassignment.\n\n"
-        "   Log into Neurax Dashboard for full details.\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "Sent by Neurax Taskifier\n"
-        "Automated notification on behalf of your Manager\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    )
-
-    return subject, body
+def _resolve_recipient_email(member: dict[str, Any]) -> str:
+    name = str(member.get("name", "")).strip().lower()
+    if name in SPECIAL_RECIPIENT_OVERRIDES:
+        return SPECIAL_RECIPIENT_OVERRIDES[name]
+    return str(member.get("email", "")).strip()
 
 
 def send_assignment_emails(payload: dict[str, Any]) -> dict[str, Any]:
-    team = payload.get("team", [])
+    project_name = payload.get("project_name", "Neurax Project")
+    priority = payload.get("priority", "Medium")
+    deadline_days = int(payload.get("deadline_days", 1))
+    tasks = payload.get("tasks", [])
+    team = list(payload.get("team", []))
+
+    # Sender = manager's Gmail account
+    sender_email = os.getenv("EMAIL_HOST_USER")
+    sender_password = os.getenv("EMAIL_HOST_PASSWORD")
+    smtp_host = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("EMAIL_PORT", 587))
+    smtp_ssl_port = int(os.getenv("EMAIL_SSL_PORT", 465))
+    use_tls = os.getenv("EMAIL_USE_TLS", "True") == "True"
+
+    deadline_date = (
+        datetime.now() + timedelta(days=deadline_days)
+    ).strftime("%d %b %Y")
+
+    teammates = "\n".join([
+        f"   • {member.get('name', 'Unknown')} — {member.get('role', 'Contributor')}" for member in team
+    ])
+
+    task_list = "\n".join([
+        f"   • {task.get('name', 'Task')} — {task.get('duration', 1)} days"
+        for task in tasks
+    ])
+
+    if not task_list:
+        task_list = "   • Task details available in Neurax Dashboard"
+
+    deduped_team = []
+    seen_emails: set[str] = set()
+    for member in team:
+        resolved_email = _resolve_recipient_email(member)
+        if not resolved_email:
+            continue
+        if resolved_email in seen_emails:
+            continue
+        seen_emails.add(resolved_email)
+        row = dict(member)
+        row["email"] = resolved_email
+        deduped_team.append(row)
+    team = deduped_team
+
     results: list[dict[str, Any]] = []
-    sent = 0
-    failed = 0
 
-    from_email = getattr(settings, "EMAIL_HOST_USER", "")
-
-    def is_certificate_error(error: Exception) -> bool:
-        message = str(error).lower()
-        return "certificate_verify_failed" in message or "ssl" in message and "certificate" in message
-
-    def send_message(recipient_email: str, subject: str, body: str, insecure_tls: bool = False) -> None:
-        host = getattr(settings, "EMAIL_HOST", "smtp.gmail.com")
-        port = int(getattr(settings, "EMAIL_PORT", 587))
-        username = getattr(settings, "EMAIL_HOST_USER", "")
-        password = getattr(settings, "EMAIL_HOST_PASSWORD", "")
-        use_tls = bool(getattr(settings, "EMAIL_USE_TLS", True))
-        timeout = int(getattr(settings, "EMAIL_TIMEOUT", 30))
-
-        context = ssl.create_default_context(cafile=certifi.where())
-        if insecure_tls:
-            context = ssl._create_unverified_context()
-
-        message = MimeEmailMessage()
-        message["Subject"] = subject
-        message["From"] = from_email or username
-        message["To"] = recipient_email
-        message.set_content(body)
-
-        with smtplib.SMTP(host, port, timeout=timeout) as server:
+    def send_with_starttls() -> None:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
             server.ehlo()
             if use_tls:
-                server.starttls(context=context)
+                server.starttls()
                 server.ehlo()
-            if username and password:
-                server.login(username, password)
-            server.send_message(message)
+            server.login(sender_email, sender_password)
+            for member in team:
+                recipient_email = _resolve_recipient_email(member)
+                first_name = str(member.get("name", "Teammate")).split()[0].replace(".", "")
 
-    for member in team:
-        subject, body = compose_assignment_email(payload, member)
-        recipient_email = member.get("email", "")
+                message = MIMEMultipart("alternative")
+                message["Subject"] = f"🚀 Project Assignment — {project_name} | Neurax"
+                message["From"] = f"Neurax Taskifier <{sender_email}>"
+                message["To"] = recipient_email
+
+                body = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        NEURAX TASK ASSIGNMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Hi {first_name},
+
+You have been officially assigned to a new project.
+
+📌 PROJECT
+   Name     : {project_name}
+   Priority : {priority}
+   Deadline : {deadline_days} days from today ({deadline_date})
+
+👥 YOUR TEAM
+{teammates}
+
+📋 YOUR TASKS
+{task_list}
+
+⚠️  IMPORTANT
+   Complete all deliverables before the deadline.
+   Late submissions trigger automatic reassignment.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sent by Neurax Taskifier
+On behalf of your Manager
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+                message.attach(MIMEText(body, "plain", "utf-8"))
+                server.sendmail(sender_email, recipient_email, message.as_string())
+                results.append({
+                    "email": recipient_email,
+                    "status": "success",
+                })
+
+    def send_with_ssl() -> None:
+        with smtplib.SMTP_SSL(smtp_host, smtp_ssl_port, timeout=30) as server:
+            server.ehlo()
+            server.login(sender_email, sender_password)
+            for member in team:
+                recipient_email = _resolve_recipient_email(member)
+                first_name = str(member.get("name", "Teammate")).split()[0].replace(".", "")
+
+                message = MIMEMultipart("alternative")
+                message["Subject"] = f"🚀 Project Assignment — {project_name} | Neurax"
+                message["From"] = f"Neurax Taskifier <{sender_email}>"
+                message["To"] = recipient_email
+
+                body = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        NEURAX TASK ASSIGNMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Hi {first_name},
+
+You have been officially assigned to a new project.
+
+📌 PROJECT
+   Name     : {project_name}
+   Priority : {priority}
+   Deadline : {deadline_days} days from today ({deadline_date})
+
+👥 YOUR TEAM
+{teammates}
+
+📋 YOUR TASKS
+{task_list}
+
+⚠️  IMPORTANT
+   Complete all deliverables before the deadline.
+   Late submissions trigger automatic reassignment.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sent by Neurax Taskifier
+On behalf of your Manager
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+                message.attach(MIMEText(body, "plain", "utf-8"))
+                server.sendmail(sender_email, recipient_email, message.as_string())
+                results.append({
+                    "email": recipient_email,
+                    "status": "success",
+                })
+
+    try:
+        send_with_starttls()
+
+    except smtplib.SMTPAuthenticationError as auth_error:
+        return {
+            "sent": 0,
+            "failed": len(team),
+            "error": (
+                "Authentication failed - check EMAIL_HOST_USER and EMAIL_HOST_PASSWORD in .env. "
+                f"SMTP said: {auth_error}"
+            ),
+            "results": [
+                {"email": member.get("email", "unknown"), "status": "failed", "error": str(auth_error)}
+                for member in team
+            ],
+        }
+
+    except Exception as error:
+        # Retry with SMTP SSL in case local network blocks STARTTLS negotiation.
         try:
-            send_message(recipient_email, subject, body)
-            results.append({"email": recipient_email, "status": "success"})
-            sent += 1
-        except Exception as error:
-            allow_insecure = bool(getattr(settings, "EMAIL_ALLOW_INSECURE_TLS", False))
-            if allow_insecure and is_certificate_error(error):
-                try:
-                    send_message(recipient_email, subject, body, insecure_tls=True)
-                    results.append({"email": recipient_email, "status": "success"})
-                    sent += 1
-                    continue
-                except Exception as retry_error:
-                    results.append({"email": recipient_email, "status": "failed", "error": str(retry_error)})
-                    failed += 1
-                    continue
-
-            results.append({"email": recipient_email, "status": "failed", "error": str(error)})
-            failed += 1
+            results.clear()
+            send_with_ssl()
+        except smtplib.SMTPAuthenticationError as auth_error:
+            return {
+                "sent": 0,
+                "failed": len(team),
+                "error": (
+                    "Authentication failed - check EMAIL_HOST_USER and EMAIL_HOST_PASSWORD in .env. "
+                    f"SMTP said: {auth_error}"
+                ),
+                "results": [
+                    {"email": member.get("email", "unknown"), "status": "failed", "error": str(auth_error)}
+                    for member in team
+                ],
+            }
+        except Exception as ssl_error:
+            return {
+                "sent": 0,
+                "failed": len(team),
+                "error": f"STARTTLS error: {error} | SSL error: {ssl_error}",
+                "results": [
+                    {"email": member.get("email", "unknown"), "status": "failed", "error": str(ssl_error)}
+                    for member in team
+                ],
+            }
 
     return {
-        "sent": sent,
-        "failed": failed,
+        "sent": len(results),
+        "failed": 0,
         "results": results,
     }

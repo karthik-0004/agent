@@ -26,20 +26,23 @@ const request = async (runner) => {
   }
 };
 
-export const runAgent = (description, teamSize, reshuffleToken = 0) =>
+export const runAgent = (description, teamSize, reshuffleToken = 0, avoidConflicts = false) =>
   request(() =>
     api.post('/agent/run/', {
       project_description: description,
       team_size: teamSize,
       reshuffle_token: reshuffleToken,
+      avoid_conflicts: avoidConflicts,
     })
   );
 
 export const getEmployees = () => request(() => api.get('/employees/'));
 export const createEmployee = (employee) => request(() => api.post('/employees/', employee));
+export const addEmployee = (employee) => request(() => api.post('/employees/add/', employee));
 export const updateEmployee = (employeeId, employee) =>
   request(() => api.put(`/employees/${employeeId}/`, employee));
 export const deleteEmployee = (employeeId) => request(() => api.delete(`/employees/${employeeId}/`));
+export const getEmployeeStatuses = () => request(() => api.get('/employees/status/'));
 export const getProjects = () => request(() => api.get('/projects/'));
 export const getTools = () => request(() => api.get('/tools/'));
 export const getHistory = () => request(() => api.get('/history/'));
@@ -54,5 +57,14 @@ export const replanAgent = (completedTasks, remainingDesc) =>
 
 export const sendAssignments = (payload) =>
   request(() => api.post('/agent/send-assignments/', payload));
+
+export const getTaskBoard = () => request(() => api.get('/taskboard/'));
+export const createTaskBoardProject = (payload) => request(() => api.post('/taskboard/create/', payload));
+export const addTaskBoardMember = (projectId, member) =>
+  request(() => api.patch(`/taskboard/${projectId}/add-member/`, { member }));
+export const removeTaskBoardMember = (projectId, member) =>
+  request(() => api.patch(`/taskboard/${projectId}/remove-member/`, { member }));
+export const completeTaskBoardProject = (projectId) =>
+  request(() => api.patch(`/taskboard/${projectId}/complete/`, {}));
 
 export default api;

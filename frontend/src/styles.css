@@ -434,6 +434,11 @@ button {
   color: #344054;
 }
 
+.chip.amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .status-pill.available {
   background: #dcfce7;
   color: #166534;
@@ -792,6 +797,18 @@ button {
   grid-template-columns: 220px 1fr;
   gap: 12px;
   align-items: center;
+}
+
+.mini-icon-button {
+  margin-left: 8px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.warning-card {
+  border: 1px solid #fca5a5;
+  background: #fff7ed;
 }
 
 .bucket-progress-wrap {

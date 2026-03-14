@@ -21,8 +21,20 @@ _DATA_CACHE: dict[str, list[dict[str, Any]]] = {}
 _DATA_SOURCE_PATHS: dict[str, Path] = {}
 _CACHE_LOCK = Lock()
 
-KARTHIK_PROFILE = {
+SPECIAL_PROFILES = [
+{
     "employee_id": "EMP-001",
+    "name": "Akshaya Nuthalapati",
+    "email": "aksh.ayanuthalapati.0523@gmail.com",
+    "role": "Full Stack Developer",
+    "skills": "python, react, django, api design, sql, system design, node.js, aws",
+    "current_workload_percent": 38,
+    "location": "Chennai, India",
+    "availability_status": "Available",
+    "rating": 9,
+},
+{
+    "employee_id": "EMP-002",
     "name": "G. Karthikeyan",
     "email": "karthikgangaji@gmail.com",
     "role": "Full Stack Developer",
@@ -31,6 +43,24 @@ KARTHIK_PROFILE = {
     "location": "Chennai, India",
     "availability_status": "Available",
     "rating": 9,
+},
+{
+    "employee_id": "EMP-003",
+    "name": "Lohitaksh",
+    "email": "lohitaksh@neurax.io",
+    "role": "Software Engineer",
+    "skills": "python, react, django, sql, api design",
+    "current_workload_percent": 34,
+    "location": "India",
+    "availability_status": "Available",
+    "rating": 8,
+},
+]
+
+SPECIAL_NAME_ALIASES = {
+    "akshaya": "Akshaya Nuthalapati",
+    "g karthikeyan": "G. Karthikeyan",
+    "karthikeyan": "G. Karthikeyan",
 }
 
 
@@ -86,10 +116,12 @@ def _email_from_name(name: str) -> str:
 
 def _canonicalize_employee(record: dict[str, Any]) -> dict[str, Any]:
     employee_name = _string(record.get("name") or record.get("employee_name"))
+    normalized_name = re.sub(r"[^a-z0-9]+", " ", employee_name.lower()).strip()
+    employee_name = SPECIAL_NAME_ALIASES.get(normalized_name, employee_name)
     email_value = _string(record.get("email") or record.get("email_address"))
     if not email_value:
-        if employee_name.lower() == "g. karthikeyan":
-            email_value = KARTHIK_PROFILE["email"]
+        if employee_name.lower() == "akshaya nuthalapati":
+            email_value = "aksh.ayanuthalapati.0523@gmail.com"
         else:
             email_value = _email_from_name(employee_name)
 
@@ -174,18 +206,44 @@ def _canonicalize_dataset(dataset_name: str, records: list[dict[str, Any]]) -> l
     return records
 
 
-def _ensure_karthik_record(employees: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    non_karthik = [employee for employee in employees if _string(employee.get("name")).lower() != "g. karthikeyan"]
-    karthik = _canonicalize_employee(KARTHIK_PROFILE)
-    ordered = [karthik, *non_karthik]
+def _ensure_special_records(employees: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    special_names = {_string(profile.get("name")).lower() for profile in SPECIAL_PROFILES}
+    non_special = []
+    seen_names: set[str] = set()
+    for employee in employees:
+        name = _string(employee.get("name")).lower()
+        if name in special_names:
+            continue
+        if name in seen_names:
+            continue
+        seen_names.add(name)
+        non_special.append(employee)
+    special_records = [_canonicalize_employee(profile) for profile in SPECIAL_PROFILES]
+    ordered = [*special_records, *non_special]
     for index, employee in enumerate(ordered, start=1):
-        if employee.get("name") == "G. Karthikeyan":
-            employee["employee_id"] = "EMP-001"
+        if _string(employee.get("name")).lower() in special_names:
+            profile = next(
+                (item for item in SPECIAL_PROFILES if _string(item.get("name")).lower() == _string(employee.get("name")).lower()),
+                None,
+            )
+            if profile:
+                employee["employee_id"] = profile["employee_id"]
             continue
         employee_id = _string(employee.get("employee_id"))
         if not employee_id or employee_id == "EMP-001":
             employee["employee_id"] = f"EMP-{index:03d}"
     return ordered
+
+
+def _clear_cache() -> None:
+    _DATA_CACHE.clear()
+    _DATA_SOURCE_PATHS.clear()
+
+
+def reload_data() -> dict[str, list[dict[str, Any]]]:
+    with _CACHE_LOCK:
+        _clear_cache()
+    return preload_data()
 
 
 def _load_dataset(file_path: Path) -> list[dict[str, Any]]:
@@ -230,7 +288,7 @@ def preload_data() -> dict[str, list[dict[str, Any]]]:
             return _DATA_CACHE
         for dataset_name in DATA_FILE_CANDIDATES:
             _DATA_CACHE[dataset_name] = _load_first_available_dataset(dataset_name)
-        _DATA_CACHE["employees"] = _ensure_karthik_record(_DATA_CACHE.get("employees", []))
+        _DATA_CACHE["employees"] = _ensure_special_records(_DATA_CACHE.get("employees", []))
         return _DATA_CACHE
 
 
@@ -288,8 +346,9 @@ def add_employee(payload: dict[str, Any]) -> dict[str, Any]:
     if not new_record.get("availability_status"):
         new_record["availability_status"] = "Available"
     employees.append(new_record)
-    employees[:] = _ensure_karthik_record(employees)
+    employees[:] = _ensure_special_records(employees)
     _persist_employees()
+    reload_data()
     return new_record
 
 
@@ -303,8 +362,9 @@ def update_employee(employee_id: str, payload: dict[str, Any]) -> dict[str, Any]
         canonical = _canonicalize_employee(merged)
         canonical["employee_id"] = employee_id
         employees[index] = canonical
-        employees[:] = _ensure_karthik_record(employees)
+        employees[:] = _ensure_special_records(employees)
         _persist_employees()
+        reload_data()
         return canonical
     return None
 
@@ -315,6 +375,7 @@ def delete_employee(employee_id: str) -> bool:
     employees[:] = [employee for employee in employees if _string(employee.get("employee_id")) != employee_id]
     if len(employees) == original_count:
         return False
-    employees[:] = _ensure_karthik_record(employees)
+    employees[:] = _ensure_special_records(employees)
     _persist_employees()
+    reload_data()
     return True

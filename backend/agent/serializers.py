@@ -5,6 +5,7 @@ class AgentRunSerializer(serializers.Serializer):
     project_description = serializers.CharField()
     team_size = serializers.IntegerField(min_value=1, max_value=5, required=False, default=3)
     reshuffle_token = serializers.IntegerField(required=False, default=0)
+    avoid_conflicts = serializers.BooleanField(required=False, default=False)
 
 
 class AgentReplanSerializer(serializers.Serializer):
@@ -47,3 +48,22 @@ class SendAssignmentsSerializer(serializers.Serializer):
     deadline_date = serializers.CharField()
     tasks = AssignmentTaskSerializer(many=True, required=False)
     team = AssignmentMemberSerializer(many=True)
+
+
+class TaskBoardCreateSerializer(serializers.Serializer):
+    project_name = serializers.CharField()
+    priority = serializers.CharField(required=False, default="Medium")
+    deadline_days = serializers.IntegerField(required=False, default=14)
+    deadline_date = serializers.CharField(required=False, allow_blank=True, default="")
+    tasks = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+    team = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+    status = serializers.CharField(required=False, default="ongoing")
+
+
+class TaskBoardMemberUpdateSerializer(serializers.Serializer):
+    member = serializers.DictField(required=True)
+
+
+class TaskBoardConflictDecisionSerializer(serializers.Serializer):
+    project_name = serializers.CharField(required=False, allow_blank=True)
+    conflicts = serializers.ListField(child=serializers.DictField(), required=False, default=list)

@@ -57,6 +57,9 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        "OPTIONS": {
+            "timeout": 30,
+        },
     }
 }
 
@@ -81,14 +84,13 @@ REST_FRAMEWORK = {
     ],
 }
 
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Neurax Taskifier")
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "30"))
 EMAIL_ALLOW_INSECURE_TLS = os.getenv("EMAIL_ALLOW_INSECURE_TLS", "False").lower() == "true"
-DEFAULT_FROM_EMAIL = (
-    f"{EMAIL_FROM_NAME} <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else EMAIL_FROM_NAME
-)
+DEFAULT_FROM_EMAIL = f"Neurax Taskifier <{os.getenv('EMAIL_HOST_USER')}>"

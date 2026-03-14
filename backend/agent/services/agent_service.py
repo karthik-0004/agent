@@ -11,7 +11,11 @@ from typing import Any
 
 class AgentService:
     MODEL_NAME = "gpt-4o"
-    KARTHIK_NAME = "G. Karthikeyan"
+    SPECIAL_USERS = {
+        "Akshaya Nuthalapati": "aksh.ayanuthalapati.0523@gmail.com",
+        "G. Karthikeyan": "karthikgangaji@gmail.com",
+        "Lohitaksh": "lohitaksh@neurax.io",
+    }
 
     def __init__(self) -> None:
         self.api_key = os.getenv("OPENAI_API_KEY", "")
@@ -28,6 +32,55 @@ class AgentService:
         if not value:
             return []
         return [item.strip().lower() for item in re.split(r"[;,/|]", str(value)) if item.strip()]
+
+    def _is_special_user(self, name: str) -> bool:
+        return str(name) in self.SPECIAL_USERS
+
+    def _get_active_assignment_map(self) -> dict[str, str]:
+        try:
+            from agent.models import TaskBoardProject
+
+            mapping: dict[str, str] = {}
+            ongoing = TaskBoardProject.objects.filter(status="ongoing")
+            for project in ongoing:
+                for member in project.team or []:
+                    member_name = str(member.get("name", "")).strip()
+                    if member_name:
+                        mapping[member_name] = project.project_name
+            return mapping
+        except Exception:
+            return {}
+
+    def _choose_special_user(
+        self,
+        employees: list[dict[str, Any]],
+        reshuffle_token: int,
+        avoid_conflicts: bool,
+    ) -> dict[str, Any] | None:
+        by_name = {str(employee.get("name")): employee for employee in employees}
+        existing_specials = [name for name in self.SPECIAL_USERS if name in by_name]
+        if not existing_specials:
+            return None
+
+        assignment_map = self._get_active_assignment_map()
+        available_specials = [
+            name
+            for name in existing_specials
+            if str(by_name[name].get("availability_status", "Available")).lower() == "available"
+            and name not in assignment_map
+        ]
+
+        if available_specials:
+            # Rotation among available special members.
+            selected_name = available_specials[reshuffle_token % len(available_specials)]
+            return by_name[selected_name]
+
+        if avoid_conflicts:
+            return None
+
+        # If all are assigned and conflicts are allowed, rotate among all specials.
+        selected_name = existing_specials[reshuffle_token % len(existing_specials)]
+        return by_name[selected_name]
 
     def analyze_project(self, project_description: str) -> dict[str, Any]:
         priority_match = re.search(r"\b(high|medium|low)\b", project_description, re.IGNORECASE)
@@ -110,13 +163,38 @@ class AgentService:
         employees: list[dict[str, Any]],
         project_priority: str = "Medium",
         risk_flags: set[str] | None = None,
+        reshuffle_token: int = 0,
+        avoid_conflicts: bool = False,
     ) -> list[dict[str, Any]]:
         ranked: list[dict[str, Any]] = []
         required_skill_set = {skill.lower() for skill in required_skills}
         risk_flags = risk_flags or set()
 
-        karthik_row: dict[str, Any] | None = None
+        selected_special = self._choose_special_user(employees, reshuffle_token, avoid_conflicts)
+        selected_special_name = str(selected_special.get("name")) if selected_special else ""
+        assignment_map = self._get_active_assignment_map()
+
+        pinned_row: dict[str, Any] | None = None
         for employee in employees:
+            employee_name = str(employee.get("name"))
+            if self._is_special_user(employee_name):
+                if employee_name != selected_special_name:
+                    continue
+                pinned_row = {
+                    "name": employee.get("name"),
+                    "role": employee.get("role"),
+                    "email": employee.get("email"),
+                    "matched_skills": [],
+                    "available_capacity": round(max(0.0, 100.0 - float(employee.get("current_workload_percent", 0) or 0)), 2),
+                    "performance_rating": self.calculate_performance_rating(employee),
+                    "deadline_risk": False,
+                    "score": 9999.0,
+                }
+                continue
+
+            if avoid_conflicts and employee_name in assignment_map:
+                continue
+
             score, matched, capacity, rating, is_risky = self.score_employee(
                 employee,
                 required_skill_set,
@@ -133,16 +211,13 @@ class AgentService:
                 "deadline_risk": is_risky,
                 "score": round(score, 2),
             }
-            if str(employee.get("name")) == self.KARTHIK_NAME:
-                karthik_row = row
-                continue
             ranked.append(row)
 
         ranked = sorted(ranked, key=lambda item: item["score"], reverse=True)
 
-        # Karthik is always pinned to slot 0 before the rest of ranking is considered.
-        if karthik_row:
-            return [karthik_row, *ranked]
+        # Exactly one special user may be pinned to slot 0.
+        if pinned_row:
+            return [pinned_row, *ranked]
 
         return ranked
 
@@ -223,6 +298,8 @@ class AgentService:
         employees: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         history: list[dict[str, Any]],
+        reshuffle_token: int = 0,
+        avoid_conflicts: bool = False,
     ) -> dict[str, Any]:
         risk_flags = self.identify_deadline_risk_flags(history)
         ranked_employees = self.match_employees(
@@ -230,10 +307,16 @@ class AgentService:
             employees,
             project_meta["priority"],
             risk_flags,
+            reshuffle_token,
+            avoid_conflicts,
         )
         relevant_tools = self.select_tools(project_meta["required_skills"], tools)
         project_name = project_description.split(".")[0][:60].strip() or "Neurax Initiative"
         top_assignees = [employee["name"] for employee in ranked_employees[:3]]
+        special_candidates = [name for name in top_assignees if self._is_special_user(name)]
+        if special_candidates:
+            pinned_name = special_candidates[0]
+            top_assignees = [pinned_name] + [name for name in top_assignees if name != pinned_name]
 
         task_templates = [
             ("Discovery and architecture", "Break down the scope, dependencies, and delivery sequence."),
@@ -361,17 +444,25 @@ class AgentService:
         project_priority: str,
         team_size: int,
         reshuffle_token: int = 0,
+        avoid_conflicts: bool = False,
     ) -> list[dict[str, Any]]:
         risk_flags = self.identify_deadline_risk_flags(history)
-        ranked = self.match_employees(required_skills, employees, project_priority, risk_flags)
+        ranked = self.match_employees(
+            required_skills,
+            employees,
+            project_priority,
+            risk_flags,
+            reshuffle_token,
+            avoid_conflicts,
+        )
 
-        karthik = next((row for row in ranked if row.get("name") == self.KARTHIK_NAME), None)
-        others = [row for row in ranked if row.get("name") != self.KARTHIK_NAME]
+        pinned = next((row for row in ranked if self._is_special_user(str(row.get("name")))), None)
+        others = [row for row in ranked if not self._is_special_user(str(row.get("name")))]
         remaining_slots = max(0, team_size - 1)
 
         chosen = []
-        if karthik:
-            chosen.append(karthik)
+        if pinned:
+            chosen.append(pinned)
 
         if team_size == 1:
             chosen = chosen[:1]
@@ -395,21 +486,43 @@ class AgentService:
                 }
             )
 
-        if payload and payload[0].get("name") != self.KARTHIK_NAME:
-            karthik_employee = employee_map.get(self.KARTHIK_NAME)
-            if karthik_employee:
+        if payload and not self._is_special_user(str(payload[0].get("name"))):
+            special_employee = self._choose_special_user(employees, reshuffle_token, avoid_conflicts)
+            if special_employee:
                 payload.insert(
                     0,
                     {
-                        "name": self.KARTHIK_NAME,
-                        "email": karthik_employee.get("email"),
-                        "role": karthik_employee.get("role"),
-                        "availability_status": karthik_employee.get("availability_status", "Available"),
-                        "current_workload_percent": karthik_employee.get("current_workload_percent", 0),
-                        "performance_rating": int(karthik_employee.get("rating", 9)),
+                        "name": special_employee.get("name"),
+                        "email": special_employee.get("email"),
+                        "role": special_employee.get("role"),
+                        "availability_status": special_employee.get("availability_status", "Available"),
+                        "current_workload_percent": special_employee.get("current_workload_percent", 0),
+                        "performance_rating": int(special_employee.get("rating", 9)),
                     },
                 )
                 payload = payload[:team_size]
+
+        if not payload:
+            special_employee = self._choose_special_user(employees, reshuffle_token, avoid_conflicts)
+            if special_employee and team_size > 0:
+                payload = [
+                    {
+                        "name": special_employee.get("name"),
+                        "email": special_employee.get("email"),
+                        "role": special_employee.get("role"),
+                        "availability_status": special_employee.get("availability_status", "Available"),
+                        "current_workload_percent": special_employee.get("current_workload_percent", 0),
+                        "performance_rating": int(special_employee.get("rating", 9)),
+                    }
+                ]
+
+        if payload:
+            first_special = next((member for member in payload if self._is_special_user(str(member.get("name")))), None)
+            if first_special:
+                payload = [first_special] + [member for member in payload if member is not first_special and not self._is_special_user(str(member.get("name")))]
+            else:
+                payload = [member for member in payload if not self._is_special_user(str(member.get("name")))]
+            payload = payload[:team_size]
 
         return payload
 
@@ -421,6 +534,7 @@ class AgentService:
         history: list[dict[str, Any]],
         team_size: int = 3,
         reshuffle_token: int = 0,
+        avoid_conflicts: bool = False,
     ) -> dict[str, Any]:
         project_meta = self.analyze_project(project_description)
         system_prompt = (
@@ -440,7 +554,15 @@ class AgentService:
         )
 
         if not self.client:
-            base_plan = self._fallback_plan(project_description, project_meta, employees, tools, history)
+            base_plan = self._fallback_plan(
+                project_description,
+                project_meta,
+                employees,
+                tools,
+                history,
+                reshuffle_token,
+                avoid_conflicts,
+            )
             assigned_team = self.select_assigned_team(
                 project_meta["required_skills"],
                 employees,
@@ -448,6 +570,7 @@ class AgentService:
                 project_meta["priority"],
                 team_size,
                 reshuffle_token,
+                avoid_conflicts,
             )
             tasks, alerts = self.enforce_assignment_rules(
                 base_plan,
@@ -474,7 +597,15 @@ class AgentService:
             content = response.choices[0].message.content or "{}"
             plan = self._extract_json(content)
         except Exception:
-            base_plan = self._fallback_plan(project_description, project_meta, employees, tools, history)
+            base_plan = self._fallback_plan(
+                project_description,
+                project_meta,
+                employees,
+                tools,
+                history,
+                reshuffle_token,
+                avoid_conflicts,
+            )
             assigned_team = self.select_assigned_team(
                 project_meta["required_skills"],
                 employees,
@@ -482,6 +613,7 @@ class AgentService:
                 project_meta["priority"],
                 team_size,
                 reshuffle_token,
+                avoid_conflicts,
             )
             tasks, alerts = self.enforce_assignment_rules(
                 base_plan,
@@ -520,6 +652,7 @@ class AgentService:
             plan.get("priority", project_meta["priority"]),
             team_size,
             reshuffle_token,
+            avoid_conflicts,
         )
         plan["tasks"], plan_alerts = self.enforce_assignment_rules(
             plan,
@@ -594,6 +727,24 @@ class AgentService:
             "currently_assigned": list(assigned_map.values()),
             "available": available,
         }
+
+    def detect_conflicts(self, assigned_team: list[dict[str, Any]]) -> list[dict[str, str]]:
+        assignment_map = self._get_active_assignment_map()
+        conflicts: list[dict[str, str]] = []
+        for member in assigned_team:
+            name = str(member.get("name", ""))
+            if not name:
+                continue
+            current_project = assignment_map.get(name)
+            if not current_project:
+                continue
+            conflicts.append(
+                {
+                    "name": name,
+                    "project_name": current_project,
+                }
+            )
+        return conflicts
 
     def apply_completed_tasks_context(
         self,

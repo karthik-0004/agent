@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  createEmployee,
+  addEmployee,
+  addTaskBoardMember,
+  completeTaskBoardProject,
+  createTaskBoardProject,
   deleteEmployee,
+  getEmployeeStatuses,
   getEmployees,
   getHistory,
   getProjects,
+  getTaskBoard,
   getTools,
+  removeTaskBoardMember,
   runAgent,
   sendAssignments,
   updateEmployee,
@@ -21,24 +27,6 @@ const splitValues = (value) =>
     .split(/[;,|]/)
     .map((item) => item.trim())
     .filter(Boolean);
-
-const buildProjectTeam = (project, employees) => {
-  if (!employees.length) {
-    return [];
-  }
-  const seed = String(project.project_id || project.project_name || '').length;
-  const count = Math.min(5, Math.max(1, (seed % 5) + 1));
-  const start = seed % employees.length;
-  const picked = [];
-  for (let index = 0; index < count; index += 1) {
-    picked.push(employees[(start + index) % employees.length]);
-  }
-  return picked.map((employee, index) => ({
-    name: employee.name,
-    role: employee.role,
-    progress: Math.max(10, Math.min(95, 35 + ((index + 1) * 13))),
-  }));
-};
 
 const EmployeeForm = ({ initialValues, onSubmit, onCancel, busy }) => {
   const [form, setForm] = useState(
@@ -172,6 +160,7 @@ const ExpandableProjectCard = ({ project, badge, dotTone, children }) => {
 const App = () => {
   const [activeView, setActiveView] = useState('mission-control');
   const [employees, setEmployees] = useState([]);
+  const [employeeStatuses, setEmployeeStatuses] = useState([]);
   const [projects, setProjects] = useState([]);
   const [history, setHistory] = useState([]);
   const [tools, setTools] = useState([]);
@@ -181,9 +170,10 @@ const App = () => {
   const [error, setError] = useState('');
   const [plan, setPlan] = useState(null);
   const [assignedTeam, setAssignedTeam] = useState([]);
+  const [teamConflicts, setTeamConflicts] = useState([]);
+  const [conflictsResolved, setConflictsResolved] = useState(false);
   const [activeAssignments, setActiveAssignments] = useState({ currently_assigned: [], available: [] });
-  const [buckets, setBuckets] = useState([]);
-  const [completedBuckets, setCompletedBuckets] = useState([]);
+  const [taskBoardProjects, setTaskBoardProjects] = useState([]);
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [savingEmployee, setSavingEmployee] = useState(false);
@@ -192,64 +182,84 @@ const App = () => {
   const [sendingEmails, setSendingEmails] = useState(false);
   const [emailToast, setEmailToast] = useState(null);
 
-  const assignedNames = useMemo(() => {
-    const names = new Set();
-    (activeAssignments.currently_assigned || []).forEach((row) => names.add(row.employee_name));
-    return names;
-  }, [activeAssignments]);
+  const loadCoreData = async () => {
+    const [employeeData, statusData, projectData, historyData, toolData, taskboardData] = await Promise.all([
+      getEmployees(),
+      getEmployeeStatuses(),
+      getProjects(),
+      getHistory(),
+      getTools(),
+      getTaskBoard(),
+    ]);
+    setEmployees(employeeData);
+    setEmployeeStatuses(statusData);
+    setProjects(projectData);
+    setHistory(historyData);
+    setTools(toolData);
+    setTaskBoardProjects(taskboardData);
+    if (!description) {
+      setDescription(projectData[0]?.description || '');
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [employeeData, projectData, historyData, toolData] = await Promise.all([
-          getEmployees(),
-          getProjects(),
-          getHistory(),
-          getTools(),
-        ]);
-        setEmployees(employeeData);
-        setProjects(projectData);
-        setHistory(historyData);
-        setTools(toolData);
-        setDescription(projectData[0]?.description || '');
-        setActiveAssignments({
-          currently_assigned: [],
-          available: employeeData.map((employee) => ({
-            employee_name: employee.name,
-            role: employee.role,
-            current_workload_percent: employee.current_workload_percent,
-          })),
-        });
-      } catch (requestError) {
-        setError(requestError.message);
-      }
-    };
-
-    fetchData();
+    loadCoreData().catch((requestError) => setError(requestError.message));
   }, []);
 
-  const handleRunPlan = async () => {
+  useEffect(() => {
+    const assigned = (taskBoardProjects || [])
+      .filter((project) => project.status === 'ongoing')
+      .flatMap((project) =>
+        (project.team || []).map((member) => ({
+          employee_name: member.name,
+          task_name: project.project_name,
+          priority: project.priority,
+          estimated_deadline_days: project.deadline_days,
+        }))
+      );
+
+    const assignedNames = new Set(assigned.map((row) => row.employee_name));
+    const available = employees
+      .filter((employee) => !assignedNames.has(employee.name))
+      .map((employee) => ({
+        employee_name: employee.name,
+        role: employee.role,
+        current_workload_percent: employee.current_workload_percent,
+      }));
+
+    setActiveAssignments({ currently_assigned: assigned, available });
+  }, [taskBoardProjects, employees]);
+
+  const assignedNames = useMemo(() => {
+    const names = new Set();
+    employeeStatuses
+      .filter((row) => String(row.status).toLowerCase() === 'assigned')
+      .forEach((row) => names.add(row.name));
+    return names;
+  }, [employeeStatuses]);
+
+  const ongoingBuckets = useMemo(
+    () => taskBoardProjects.filter((project) => String(project.status).toLowerCase() === 'ongoing'),
+    [taskBoardProjects]
+  );
+
+  const completedBuckets = useMemo(
+    () => taskBoardProjects.filter((project) => String(project.status).toLowerCase() === 'completed'),
+    [taskBoardProjects]
+  );
+
+  const handleRunPlan = async (avoidConflicts = false, tokenOverride = null) => {
     setLoading(true);
     setError('');
     setTeamConfirmed(false);
     setEmailToast(null);
     try {
-      const response = await runAgent(description, teamSize, reshuffleToken);
+      const token = tokenOverride === null ? reshuffleToken : tokenOverride;
+      const response = await runAgent(description, teamSize, token, avoidConflicts);
       setPlan(response);
-      const team = (response.assigned_team || []).slice(0, teamSize);
-      setAssignedTeam(team);
-      setActiveAssignments(response.active_assignments || { currently_assigned: [], available: [] });
-      setBuckets([
-        {
-          id: `${Date.now()}`,
-          project_name: response.project_name,
-          priority: response.priority,
-          deadline_days: response.deadline_days,
-          team,
-          tasks: response.tasks || [],
-        },
-      ]);
-      setActiveView('mission-control');
+      setAssignedTeam((response.assigned_team || []).slice(0, teamSize));
+      setTeamConflicts(response.team_conflicts || []);
+      setConflictsResolved((response.team_conflicts || []).length === 0 || avoidConflicts);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -260,26 +270,16 @@ const App = () => {
   const handleReshuffleTeam = async () => {
     const nextToken = reshuffleToken + 1;
     setReshuffleToken(nextToken);
+    setTeamConflicts([]);
+    setConflictsResolved(false);
     setLoading(true);
     setError('');
-    setTeamConfirmed(false);
-    setEmailToast(null);
     try {
-      const response = await runAgent(description, teamSize, nextToken);
-      const team = (response.assigned_team || []).slice(0, teamSize);
+      const response = await runAgent(description, teamSize, nextToken, false);
       setPlan(response);
-      setAssignedTeam(team);
-      setActiveAssignments(response.active_assignments || { currently_assigned: [], available: [] });
-      setBuckets([
-        {
-          id: `${Date.now()}`,
-          project_name: response.project_name,
-          priority: response.priority,
-          deadline_days: response.deadline_days,
-          team,
-          tasks: response.tasks || [],
-        },
-      ]);
+      setAssignedTeam((response.assigned_team || []).slice(0, teamSize));
+      setTeamConflicts(response.team_conflicts || []);
+      setConflictsResolved((response.team_conflicts || []).length === 0);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -287,9 +287,39 @@ const App = () => {
     }
   };
 
-  const handleConfirmTeam = () => {
-    setTeamConfirmed(true);
-    setEmailToast(null);
+  const handleFindOthers = async () => {
+    const nextToken = reshuffleToken + 1;
+    setReshuffleToken(nextToken);
+    await handleRunPlan(true, nextToken);
+  };
+
+  const handleAcceptConflicts = () => {
+    setConflictsResolved(true);
+  };
+
+  const handleConfirmTeam = async () => {
+    if (!plan || !assignedTeam.length) {
+      return;
+    }
+
+    try {
+      const deadlineDate = new Date(Date.now() + Number(plan.deadline_days || 1) * 86400000)
+        .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      await createTaskBoardProject({
+        project_name: plan.project_name,
+        priority: plan.priority,
+        deadline_days: plan.deadline_days,
+        deadline_date: deadlineDate,
+        tasks: plan.tasks || [],
+        team: assignedTeam,
+        status: 'ongoing',
+      });
+      setTeamConfirmed(true);
+      await loadCoreData();
+      setActiveView('task-board');
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
   const handleSendAssignments = async () => {
@@ -313,21 +343,18 @@ const App = () => {
         })),
         team: assignedTeam.map((member) => ({
           name: member.name,
-          email: member.email,
+          email: String(member.name || '').toLowerCase().includes('akshaya')
+            ? 'aksh.ayanuthalapati.0523@gmail.com'
+            : member.email,
           role: member.role,
         })),
       });
 
       if (response.failed > 0) {
         const failedRecord = (response.results || []).find((row) => row.status === 'failed');
-        const backendError = String(failedRecord?.error || '').toLowerCase();
-        let message = `❌ Failed to reach ${failedRecord?.email || 'a recipient'} — check SMTP`;
-        if (backendError.includes('535') || backendError.includes('badcredentials')) {
-          message = `❌ Gmail rejected login for ${failedRecord?.email || 'recipient'} — use a 16-char App Password`;
-        }
         setEmailToast({
           type: 'error',
-          message,
+          message: `❌ Failed to reach ${failedRecord?.email || 'a recipient'} — check SMTP`,
         });
       } else {
         setEmailToast({
@@ -336,32 +363,45 @@ const App = () => {
         });
       }
     } catch (requestError) {
-      setEmailToast({
-        type: 'error',
-        message: `❌ ${requestError.message}`,
-      });
+      setEmailToast({ type: 'error', message: `❌ ${requestError.message}` });
     } finally {
       setSendingEmails(false);
     }
   };
 
-  const handleMarkBucketComplete = (bucketId) => {
-    setBuckets((previous) => {
-      const target = previous.find((bucket) => bucket.id === bucketId);
-      if (target) {
-        setCompletedBuckets((completed) => [
-          {
-            project_name: target.project_name,
-            summary: `${target.project_name} completed with ${target.team.length} team members.`,
-            team_members: target.team.map((member) => member.name).join(';'),
-            tools_used: target.tasks.flatMap((task) => task.tools || []).slice(0, 6).join(';'),
-            outcome: 'Successful',
-          },
-          ...completed,
-        ]);
-      }
-      return previous.filter((bucket) => bucket.id !== bucketId);
+  const handleAddMember = async (bucket) => {
+    const options = employees
+      .filter((employee) => !bucket.team.some((member) => member.name === employee.name))
+      .map((employee) => employee.name);
+
+    const pickedName = window.prompt(`Add member to ${bucket.project_name}. Enter exact name:\n${options.slice(0, 20).join(', ')}`);
+    if (!pickedName) {
+      return;
+    }
+
+    const pickedEmployee = employees.find((employee) => employee.name.toLowerCase() === pickedName.toLowerCase());
+    if (!pickedEmployee) {
+      setError('Employee not found for add-member.');
+      return;
+    }
+
+    await addTaskBoardMember(bucket.id, {
+      name: pickedEmployee.name,
+      email: pickedEmployee.email,
+      role: pickedEmployee.role,
+      current_workload_percent: pickedEmployee.current_workload_percent,
     });
+    await loadCoreData();
+  };
+
+  const handleRemoveMember = async (bucket, member) => {
+    await removeTaskBoardMember(bucket.id, { name: member.name });
+    await loadCoreData();
+  };
+
+  const handleMarkBucketComplete = async (bucketId) => {
+    await completeTaskBoardProject(bucketId);
+    await loadCoreData();
   };
 
   const handleSaveEmployee = async (payload) => {
@@ -371,10 +411,9 @@ const App = () => {
       if (editingEmployee?.employee_id) {
         await updateEmployee(editingEmployee.employee_id, payload);
       } else {
-        await createEmployee(payload);
+        await addEmployee(payload);
       }
-      const refreshed = await getEmployees();
-      setEmployees(refreshed);
+      await loadCoreData();
       setEditingEmployee(null);
       setActiveView('employees');
     } catch (requestError) {
@@ -391,19 +430,11 @@ const App = () => {
     }
     try {
       await deleteEmployee(employee.employee_id);
-      const refreshed = await getEmployees();
-      setEmployees(refreshed);
+      await loadCoreData();
     } catch (requestError) {
       setError(requestError.message);
     }
   };
-
-  const ongoingProjects = useMemo(
-    () => projects.filter((project) => String(project.status || '').toLowerCase() !== 'completed'),
-    [projects]
-  );
-
-  const pastProjects = useMemo(() => [...completedBuckets, ...history], [completedBuckets, history]);
 
   const renderContent = () => {
     if (activeView === 'mission-control') {
@@ -411,7 +442,7 @@ const App = () => {
         <Orchestrator
           description={description}
           onDescriptionChange={setDescription}
-          onRun={handleRunPlan}
+          onRun={() => handleRunPlan(false)}
           onReshuffle={handleReshuffleTeam}
           loading={loading}
           projects={projects}
@@ -419,6 +450,10 @@ const App = () => {
           onTeamSizeChange={setTeamSize}
           plan={plan}
           assignedTeam={assignedTeam}
+          teamConflicts={teamConflicts}
+          conflictsResolved={conflictsResolved}
+          onAcceptConflicts={handleAcceptConflicts}
+          onFindOthers={handleFindOthers}
           teamConfirmed={teamConfirmed}
           onConfirmTeam={handleConfirmTeam}
           onSendAssignments={handleSendAssignments}
@@ -432,10 +467,12 @@ const App = () => {
     if (activeView === 'task-board') {
       return (
         <TaskBoard
-          buckets={buckets}
+          buckets={ongoingBuckets}
           priorityFilter={priorityFilter}
           onFilterChange={setPriorityFilter}
           onMarkComplete={handleMarkBucketComplete}
+          onAddMember={handleAddMember}
+          onRemoveMember={handleRemoveMember}
         />
       );
     }
@@ -482,27 +519,19 @@ const App = () => {
             </div>
           </div>
           <div className="dataset-grid">
-            {ongoingProjects.map((project) => {
-              const roster = buildProjectTeam(project, employees);
-              return (
-                <ExpandableProjectCard key={project.project_id || project.project_name} project={project} badge="Ongoing" dotTone="green">
-                  <p className="dataset-meta">Deadline countdown: {project.deadline_days} days</p>
-                  <div className="bucket-lines">
-                    {roster.map((member) => (
-                      <div key={`${project.project_id}-${member.name}`} className="bucket-line">
-                        <span>{member.name}</span>
-                        <div className="bucket-progress-wrap">
-                          <div className="bucket-progress-track">
-                            <div className="bucket-progress-fill" style={{ width: `${member.progress}%` }} />
-                          </div>
-                          <span>{member.progress}%</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ExpandableProjectCard>
-              );
-            })}
+            {ongoingBuckets.map((project) => (
+              <ExpandableProjectCard key={project.id} project={project} badge="Ongoing" dotTone="green">
+                <p className="dataset-meta">Deadline countdown: {project.deadline_days} days</p>
+                <div className="bucket-lines">
+                  {(project.team || []).map((member) => (
+                    <div key={`${project.id}-${member.name}`} className="bucket-line">
+                      <span>{member.name}</span>
+                      <span>{member.current_workload_percent || 0}%</span>
+                    </div>
+                  ))}
+                </div>
+              </ExpandableProjectCard>
+            ))}
           </div>
         </div>
       );
@@ -518,31 +547,18 @@ const App = () => {
             </div>
           </div>
           <div className="dataset-grid">
-            {pastProjects.map((project, index) => {
-              const teamPool = splitValues(project.team_members);
-              const fallbackTeam = buildProjectTeam({ project_id: `hist-${index}`, project_name: project.project_name }, employees)
-                .map((member) => member.name);
-              const members = (teamPool.length ? teamPool : fallbackTeam).slice(0, 5);
+            {[...completedBuckets, ...history].map((project, index) => {
+              const members = splitValues(project.team_members || (project.team || []).map((member) => member.name).join(';')).slice(0, 5);
               return (
-                <ExpandableProjectCard key={`${project.history_id || project.project_name}-${index}`} project={project} badge="Completed" dotTone="red">
+                <ExpandableProjectCard key={`${project.id || project.history_id || project.project_name}-${index}`} project={project} badge="Completed" dotTone="red">
                   <p className="dataset-meta">{project.summary || project.lessons_learned || 'Completed project.'}</p>
                   <div className="chip-row dense">
                     <span className="chip neutral">Outcome: {project.outcome || 'Successful'}</span>
                   </div>
                   <div className="chip-row dense">
-                    {members.map((memberName, memberIndex) => {
-                      const person = employees.find((employee) => employee.name === memberName);
-                      return (
-                        <span key={`${project.project_name}-${memberName}`} className="chip blue">
-                          {memberName} {person ? `(${person.role})` : ''} - C{memberIndex + 1}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  <div className="chip-row dense">
-                    {splitValues(project.tools_used).slice(0, 6).map((tool) => (
-                      <span key={`${project.project_name}-${tool}`} className="chip green">
-                        {tool}
+                    {members.map((memberName, memberIndex) => (
+                      <span key={`${project.project_name}-${memberName}`} className="chip blue">
+                        {memberName} - C{memberIndex + 1}
                       </span>
                     ))}
                   </div>
