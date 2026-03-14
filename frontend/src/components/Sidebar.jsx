@@ -22,6 +22,7 @@ const Sidebar = ({ activeView, onSelect }) => {
         { id: 'projects', label: 'Projects' },
         { id: 'past-projects', label: 'Past Projects' },
         { id: 'tools', label: 'Tools' },
+        { id: 'dataset-manager', label: 'Bulk Dataset Manager' },
       ],
     },
   ];

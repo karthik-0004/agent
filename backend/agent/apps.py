@@ -6,6 +6,12 @@ class AgentConfig(AppConfig):
     name = "agent"
 
     def ready(self):
+        from .services.agent_service import AgentService
         from .services.data_loader import preload_data
 
-        preload_data()
+        datasets = preload_data()
+        AgentService.rebuild_system_prompt(
+            datasets.get("employees", []),
+            datasets.get("tools", []),
+            datasets.get("history", []),
+        )

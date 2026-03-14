@@ -16,6 +16,12 @@ DATA_FILE_CANDIDATES = {
     "history": ["neurax_project_history_v2.xlsx", "neurax_project_history_v2.csv", "neurax_project_history_dataset.csv"],
     "tools": ["neurax_tools_v2.xlsx", "neurax_tools_v2.csv", "neurax_tools_dataset.csv"],
 }
+DEFAULT_DATASET_OUTPUT_FILES = {
+    "employees": "neurax_employees_v2.csv",
+    "projects": "neurax_projects_v2.csv",
+    "history": "neurax_project_history_v2.csv",
+    "tools": "neurax_tools_v2.csv",
+}
 
 _DATA_CACHE: dict[str, list[dict[str, Any]]] = {}
 _DATA_SOURCE_PATHS: dict[str, Path] = {}
@@ -140,6 +146,11 @@ def _canonicalize_employee(record: dict[str, Any]) -> dict[str, Any]:
         "current_workload_percent": _int(record.get("current_workload_percent") or record.get("workload_percent") or 0),
         "availability_status": _string(record.get("availability_status") or "Available"),
         "rating": max(1, min(10, rating_value)),
+        "source": _string(record.get("source") or "imported"),
+        "is_outreach": bool(record.get("is_outreach", False)),
+        "outreach_project_id": _int(record.get("outreach_project_id") or 0),
+        "rate_per_day": float(record.get("rate_per_day") or 0) if _string(record.get("rate_per_day")) else None,
+        "notes": _string(record.get("notes") or ""),
     }
 
 
@@ -157,6 +168,7 @@ def _canonicalize_project(record: dict[str, Any]) -> dict[str, Any]:
         "deadline_days": _int(record.get("deadline_days") or 14),
         "priority": priority_value.capitalize() if priority_value else "Medium",
         "status": _string(record.get("status") or "Open"),
+        "source": _string(record.get("source") or "imported"),
     }
 
 
@@ -168,6 +180,7 @@ def _canonicalize_tool(record: dict[str, Any]) -> dict[str, Any]:
         "category": _string(record.get("category") or record.get("tool_type") or "General"),
         "purpose_keywords": _string(record.get("purpose_keywords") or record.get("purpose") or ""),
         "supported_skills": _string(record.get("supported_skills") or record.get("supported_languages") or ""),
+        "source": _string(record.get("source") or "imported"),
     }
 
 
@@ -191,6 +204,7 @@ def _canonicalize_history(record: dict[str, Any]) -> dict[str, Any]:
         "on_time": bool(record.get("on_time", False)),
         "planned_days": _int(record.get("planned_days") or 0),
         "duration_days": _int(record.get("duration_days") or 0),
+        "source": _string(record.get("source") or "imported"),
     }
 
 
@@ -223,11 +237,14 @@ def _ensure_special_records(employees: list[dict[str, Any]]) -> list[dict[str, A
             merged.update(existing)
             # Keep canonical id and required pinned email for Akshaya.
             merged["employee_id"] = profile["employee_id"]
+            merged["source"] = "manual"
             if profile_name == "akshaya nuthalapati":
                 merged["email"] = "aksh.ayanuthalapati.0523@gmail.com"
             special_records.append(merged)
         else:
-            special_records.append(_canonicalize_employee(profile))
+            special = _canonicalize_employee(profile)
+            special["source"] = "manual"
+            special_records.append(special)
 
     non_special = []
     seen_names: set[str] = set()
@@ -238,6 +255,8 @@ def _ensure_special_records(employees: list[dict[str, Any]]) -> list[dict[str, A
         if name in seen_names:
             continue
         seen_names.add(name)
+        if not _string(employee.get("source")):
+            employee["source"] = "imported"
         non_special.append(employee)
 
     ordered = [*special_records, *non_special]
@@ -265,6 +284,10 @@ def reload_data() -> dict[str, list[dict[str, Any]]]:
     with _CACHE_LOCK:
         _clear_cache()
     return preload_data()
+
+
+def force_reload() -> dict[str, list[dict[str, Any]]]:
+    return reload_data()
 
 
 def _load_dataset(file_path: Path) -> list[dict[str, Any]]:
@@ -325,6 +348,17 @@ def get_projects() -> list[dict[str, Any]]:
     return get_datasets()["projects"]
 
 
+def add_project(payload: dict[str, Any]) -> dict[str, Any]:
+    projects = get_projects()
+    new_record = _canonicalize_project(payload)
+    new_record["source"] = _string(payload.get("source") or "manual")
+    projects.append(new_record)
+    persist_dataset("projects", projects)
+    with _CACHE_LOCK:
+        _DATA_CACHE["projects"] = projects
+    return new_record
+
+
 def get_tools() -> list[dict[str, Any]]:
     return get_datasets()["tools"]
 
@@ -340,9 +374,25 @@ def _employees_output_path() -> Path:
     return BACKEND_DATA_DIR / "neurax_employees_v2.csv"
 
 
+def _dataset_output_path(dataset_name: str) -> Path:
+    source = _DATA_SOURCE_PATHS.get(dataset_name)
+    if source and source.exists():
+        return source
+    return BACKEND_DATA_DIR / DEFAULT_DATASET_OUTPUT_FILES[dataset_name]
+
+
 def _persist_employees() -> None:
     output_path = _employees_output_path()
     dataframe = pd.DataFrame(get_employees())
+    if output_path.suffix.lower() in {".xlsx", ".xls"}:
+        dataframe.to_excel(output_path, index=False)
+    else:
+        dataframe.to_csv(output_path, index=False)
+
+
+def persist_dataset(dataset_name: str, records: list[dict[str, Any]]) -> None:
+    output_path = _dataset_output_path(dataset_name)
+    dataframe = pd.DataFrame(records)
     if output_path.suffix.lower() in {".xlsx", ".xls"}:
         dataframe.to_excel(output_path, index=False)
     else:
@@ -356,12 +406,32 @@ def _next_employee_id() -> str:
         match = re.search(r"(\d+)$", _string(employee.get("employee_id"), ""))
         if match:
             max_index = max(max_index, int(match.group(1)))
-    return f"EMP{max_index + 1:03d}"
+    return f"EMP-{max_index + 1:03d}"
+
+
+def replace_dataset(dataset_name: str, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    canonical = _canonicalize_dataset(dataset_name, records)
+    if dataset_name == "employees":
+        canonical = _ensure_special_records(canonical)
+    with _CACHE_LOCK:
+        _DATA_CACHE[dataset_name] = canonical
+    persist_dataset(dataset_name, canonical)
+    return canonical
+
+
+def replace_all_datasets(payload: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    replaced: dict[str, list[dict[str, Any]]] = {}
+    for dataset_name in DATA_FILE_CANDIDATES:
+        replaced[dataset_name] = replace_dataset(dataset_name, payload.get(dataset_name, []))
+    return replaced
 
 
 def add_employee(payload: dict[str, Any]) -> dict[str, Any]:
     employees = get_employees()
     new_record = _canonicalize_employee(payload)
+    new_record["source"] = "manual"
+    new_record["is_outreach"] = False
+    new_record["outreach_project_id"] = 0
     if not new_record.get("employee_id"):
         new_record["employee_id"] = _next_employee_id()
     if not new_record.get("availability_status"):
@@ -369,7 +439,8 @@ def add_employee(payload: dict[str, Any]) -> dict[str, Any]:
     employees.append(new_record)
     employees[:] = _ensure_special_records(employees)
     _persist_employees()
-    reload_data()
+    with _CACHE_LOCK:
+        _DATA_CACHE["employees"] = employees
     return new_record
 
 
@@ -382,10 +453,12 @@ def update_employee(employee_id: str, payload: dict[str, Any]) -> dict[str, Any]
         merged.update(payload)
         canonical = _canonicalize_employee(merged)
         canonical["employee_id"] = employee_id
+        canonical["source"] = "manual"
         employees[index] = canonical
         employees[:] = _ensure_special_records(employees)
         _persist_employees()
-        reload_data()
+        with _CACHE_LOCK:
+            _DATA_CACHE["employees"] = employees
         return canonical
     return None
 
@@ -398,5 +471,77 @@ def delete_employee(employee_id: str) -> bool:
         return False
     employees[:] = _ensure_special_records(employees)
     _persist_employees()
-    reload_data()
+    with _CACHE_LOCK:
+        _DATA_CACHE["employees"] = employees
     return True
+
+
+def get_special_employee_names() -> set[str]:
+    return {_string(profile.get("name")) for profile in SPECIAL_PROFILES}
+
+
+def add_outreach_employee(payload: dict[str, Any]) -> dict[str, Any]:
+    employees = get_employees()
+    new_record = _canonicalize_employee(payload)
+    new_record["source"] = "outreach"
+    new_record["is_outreach"] = True
+    new_record["availability_status"] = "Assigned"
+    if not new_record.get("employee_id"):
+        new_record["employee_id"] = _next_employee_id()
+    employees.append(new_record)
+    employees[:] = _ensure_special_records(employees)
+    _persist_employees()
+    with _CACHE_LOCK:
+        _DATA_CACHE["employees"] = employees
+    return new_record
+
+
+def delete_outreach_employee(employee_id: str, outreach_project_id: int | None = None) -> dict[str, Any] | None:
+    employees = get_employees()
+    removed: dict[str, Any] | None = None
+    retained: list[dict[str, Any]] = []
+
+    for employee in employees:
+        is_match = _string(employee.get("employee_id")) == _string(employee_id)
+        if not is_match:
+            retained.append(employee)
+            continue
+        if not bool(employee.get("is_outreach")):
+            retained.append(employee)
+            continue
+        if outreach_project_id is not None and _int(employee.get("outreach_project_id")) != outreach_project_id:
+            retained.append(employee)
+            continue
+        removed = dict(employee)
+
+    if not removed:
+        return None
+
+    retained[:] = _ensure_special_records(retained)
+    employees[:] = retained
+    _persist_employees()
+    with _CACHE_LOCK:
+        _DATA_CACHE["employees"] = employees
+    return removed
+
+
+def delete_outreach_employees_for_project(project_id: int) -> list[dict[str, Any]]:
+    employees = get_employees()
+    removed: list[dict[str, Any]] = []
+    retained: list[dict[str, Any]] = []
+
+    for employee in employees:
+        if bool(employee.get("is_outreach")) and _int(employee.get("outreach_project_id")) == int(project_id):
+            removed.append(dict(employee))
+            continue
+        retained.append(employee)
+
+    if not removed:
+        return []
+
+    retained[:] = _ensure_special_records(retained)
+    employees[:] = retained
+    _persist_employees()
+    with _CACHE_LOCK:
+        _DATA_CACHE["employees"] = employees
+    return removed

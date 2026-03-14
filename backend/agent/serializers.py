@@ -4,6 +4,7 @@ from rest_framework import serializers
 class AgentRunSerializer(serializers.Serializer):
     project_description = serializers.CharField()
     team_size = serializers.IntegerField(min_value=1, max_value=5, required=False, default=3)
+    deadline_days = serializers.IntegerField(min_value=1, max_value=365, required=False, default=14)
     reshuffle_token = serializers.IntegerField(required=False, default=0)
     avoid_conflicts = serializers.BooleanField(required=False, default=False)
 
@@ -67,3 +68,31 @@ class TaskBoardMemberUpdateSerializer(serializers.Serializer):
 class TaskBoardConflictDecisionSerializer(serializers.Serializer):
     project_name = serializers.CharField(required=False, allow_blank=True)
     conflicts = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+
+
+class DatasetUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(required=True)
+
+
+class DatasetConfirmSerializer(serializers.Serializer):
+    confirm = serializers.BooleanField(required=False, default=True)
+
+
+class OutreachAddSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    role = serializers.CharField()
+    email = serializers.EmailField()
+    skills = serializers.CharField(required=False, allow_blank=True, default="")
+    rate_per_day = serializers.FloatField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+    project_id = serializers.IntegerField(min_value=1)
+
+
+class CustomMissionSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["analyze", "plan"])
+    mission_title = serializers.CharField()
+    mission_description = serializers.CharField()
+    team_size = serializers.IntegerField(min_value=1, max_value=5, required=False, default=3)
+    deadline_days = serializers.IntegerField(min_value=1, max_value=365, required=False, default=14)
+    extracted = serializers.DictField(required=False)
+    save_to_dataset = serializers.BooleanField(required=False, default=False)

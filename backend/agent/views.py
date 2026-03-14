@@ -13,14 +13,28 @@ from .models import ActivityLog, EmployeeStatus, TaskBoardProject
 from .serializers import (
     AgentReplanSerializer,
     AgentRunSerializer,
+    DatasetConfirmSerializer,
+    DatasetUploadSerializer,
     EmployeeSerializer,
+    CustomMissionSerializer,
+    OutreachAddSerializer,
     SendAssignmentsSerializer,
     TaskBoardCreateSerializer,
     TaskBoardMemberUpdateSerializer,
 )
 from .services.agent_service import AgentService
-from .services.data_loader import add_employee, delete_employee, get_datasets, update_employee
-from .services.email_service import send_assignment_emails
+from .services.data_loader import (
+    add_project,
+    add_employee,
+    add_outreach_employee,
+    delete_employee,
+    delete_outreach_employee,
+    delete_outreach_employees_for_project,
+    get_datasets,
+    update_employee,
+)
+from .services.email_service import send_assignment_emails, send_outreach_assignment_email, send_outreach_farewell_email
+from .services.upload_service import confirm_bulk_rebuild, get_upload_status, parse_dataset_upload, reload_from_database_view
 
 
 def _sync_employee_statuses() -> list[dict]:
@@ -39,6 +53,7 @@ def _sync_employee_statuses() -> list[dict]:
             workload_delta[member_name] = workload_delta.get(member_name, 0) + 8
 
     status_payload = []
+    active_ids: set[str] = set()
     for employee in employees:
         name = str(employee.get("name", "")).strip()
         if not name:
@@ -54,6 +69,11 @@ def _sync_employee_statuses() -> list[dict]:
             "status": "assigned" if is_assigned else "available",
             "current_project": project_map.get(name),
             "workload_percent": workload,
+            "source": str(employee.get("source", "imported") or "imported"),
+            "is_outreach": bool(employee.get("is_outreach", False)),
+            "outreach_project_id": int(employee.get("outreach_project_id", 0) or 0),
+            "rate_per_day": employee.get("rate_per_day"),
+            "notes": str(employee.get("notes", "") or ""),
         }
         for attempt in range(3):
             try:
@@ -66,6 +86,11 @@ def _sync_employee_statuses() -> list[dict]:
                             "status": row["status"],
                             "current_project": row["current_project"],
                             "workload_percent": row["workload_percent"],
+                            "source": row["source"],
+                            "is_outreach": row["is_outreach"],
+                            "outreach_project_id": row["outreach_project_id"] or None,
+                            "rate_per_day": row["rate_per_day"],
+                            "notes": row["notes"],
                         },
                     )
                 break
@@ -74,6 +99,12 @@ def _sync_employee_statuses() -> list[dict]:
                     raise
                 time.sleep(0.15)
         status_payload.append(row)
+        active_ids.add(row["employee_id"])
+
+    if active_ids:
+        EmployeeStatus.objects.exclude(employee_id__in=active_ids).delete()
+    else:
+        EmployeeStatus.objects.all().delete()
 
     return status_payload
 
@@ -91,6 +122,11 @@ def _sync_employee_statuses_safe() -> list[dict]:
                 "status": row.status,
                 "current_project": row.current_project,
                 "workload_percent": row.workload_percent,
+                "source": row.source,
+                "is_outreach": row.is_outreach,
+                "outreach_project_id": row.outreach_project_id,
+                "rate_per_day": row.rate_per_day,
+                "notes": row.notes,
             }
             for row in rows
         ]
@@ -117,7 +153,7 @@ class AgentRunView(APIView):
         serializer.is_valid(raise_exception=True)
 
         datasets = get_datasets()
-        employees = datasets["employees"]
+        employees = [row for row in datasets["employees"] if not bool(row.get("is_outreach"))]
         tools = datasets["tools"]
         history = datasets["history"]
 
@@ -129,10 +165,14 @@ class AgentRunView(APIView):
             tools,
             history,
             serializer.validated_data.get("team_size", 3),
+            serializer.validated_data.get("deadline_days", 14),
             serializer.validated_data.get("reshuffle_token", 0),
             serializer.validated_data.get("avoid_conflicts", False),
         )
-        analysis = agent_service.analyze_project(serializer.validated_data["project_description"])
+        analysis = agent_service.analyze_project(
+            serializer.validated_data["project_description"],
+            serializer.validated_data.get("deadline_days", 14),
+        )
         employee_matches = agent_service.match_employees(
             analysis["required_skills"],
             employees,
@@ -157,6 +197,65 @@ class AgentRunView(APIView):
         return Response(payload, status=status.HTTP_200_OK)
 
 
+class CustomMissionView(APIView):
+    def post(self, request):
+        serializer = CustomMissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        datasets = get_datasets()
+        employees = [row for row in datasets["employees"] if not bool(row.get("is_outreach"))]
+        tools = datasets["tools"]
+        history = datasets["history"]
+
+        service = AgentService()
+
+        if data["action"] == "analyze":
+            analysis = service.analyze_custom_mission(
+                data["mission_title"],
+                data["mission_description"],
+                data.get("team_size", 3),
+                data.get("deadline_days", 14),
+                employees,
+                tools,
+                history,
+            )
+            return Response({"analysis": analysis}, status=status.HTTP_200_OK)
+
+        extracted = data.get("extracted") or {}
+        plan = service.build_custom_mission_plan(
+            data["mission_title"],
+            data["mission_description"],
+            extracted,
+            data.get("team_size", 3),
+            data.get("deadline_days", 14),
+            employees,
+            tools,
+            history,
+        )
+
+        saved_project = None
+        if data.get("save_to_dataset", False):
+            saved_project = add_project(
+                {
+                    "project_name": data["mission_title"],
+                    "description": data["mission_description"],
+                    "required_skills": ", ".join([str(item) for item in extracted.get("required_skills", [])]),
+                    "deadline_days": data.get("deadline_days", 14),
+                    "priority": plan.get("priority", "Medium"),
+                    "source": "manual",
+                }
+            )
+
+        return Response(
+            {
+                "plan": plan,
+                "saved_project": saved_project,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class AgentReplanView(APIView):
     def post(self, request):
         serializer = AgentReplanSerializer(data=request.data)
@@ -165,7 +264,7 @@ class AgentReplanView(APIView):
         datasets = get_datasets()
         agent_service = AgentService()
         adjusted_employees = agent_service.apply_completed_tasks_context(
-            datasets["employees"],
+            [row for row in datasets["employees"] if not bool(row.get("is_outreach"))],
             serializer.validated_data["completed_tasks"],
         )
         plan = agent_service.decompose_tasks(
@@ -173,7 +272,7 @@ class AgentReplanView(APIView):
             adjusted_employees,
             datasets["tools"],
             datasets["history"],
-            3,
+            team_size=3,
         )
         analysis = agent_service.analyze_project(serializer.validated_data["remaining_description"])
         risk_flags = agent_service.identify_deadline_risk_flags(datasets["history"])
@@ -228,6 +327,89 @@ class EmployeesAddView(APIView):
         return Response(created, status=status.HTTP_201_CREATED)
 
 
+class EmployeesAddOutreachView(APIView):
+    def post(self, request):
+        serializer = OutreachAddSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        try:
+            project = TaskBoardProject.objects.get(id=payload["project_id"], status="ongoing")
+        except TaskBoardProject.DoesNotExist:
+            return Response({"error": "Active project not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        team = list(project.team or [])
+        if any(bool(member.get("is_outreach")) and str(member.get("email", "")).lower() == payload["email"].lower() for member in team):
+            return Response({"error": "This outreach expert is already in the project"}, status=status.HTTP_400_BAD_REQUEST)
+
+        for row in get_datasets()["employees"]:
+            if bool(row.get("is_outreach")) and str(row.get("email", "")).lower() == payload["email"].lower():
+                return Response({"error": "Outreach expert already assigned to another project"}, status=status.HTTP_400_BAD_REQUEST)
+
+        created = add_outreach_employee(
+            {
+                "name": payload["name"],
+                "role": payload["role"],
+                "email": payload["email"],
+                "skills": payload.get("skills", ""),
+                "current_workload_percent": 60,
+                "location": "External",
+                "availability_status": "Assigned",
+                "rating": 7,
+                "is_outreach": True,
+                "outreach_project_id": project.id,
+                "rate_per_day": payload.get("rate_per_day"),
+                "notes": payload.get("notes", ""),
+                "source": "outreach",
+            }
+        )
+
+        outreach_member = {
+            "employee_id": created["employee_id"],
+            "name": created["name"],
+            "email": created["email"],
+            "role": created["role"],
+            "current_workload_percent": created.get("current_workload_percent", 60),
+            "is_outreach": True,
+            "source": "outreach",
+            "outreach_project_id": project.id,
+        }
+        if not any(str(member.get("name", "")).lower() == created["name"].lower() for member in team):
+            team.append(outreach_member)
+            project.team = team
+            project.save(update_fields=["team", "updated_at"])
+
+        _sync_employee_statuses_safe()
+
+        deadline_date = project.deadline_date or (datetime.utcnow() + timedelta(days=project.deadline_days)).strftime("%d %b %Y")
+        send_outreach_assignment_email(
+            {
+                "name": created["name"],
+                "email": created["email"],
+                "role": created["role"],
+                "project_name": project.project_name,
+                "deadline_days": project.deadline_days,
+                "deadline_date": deadline_date,
+                "team_members": team,
+            }
+        )
+
+        _log_activity(
+            "outreach_added",
+            f"Outreach expert added to {project.project_name}",
+            created["name"],
+            {"project_id": project.id, "employee_id": created["employee_id"]},
+        )
+
+        return Response(
+            {
+                "employee": created,
+                "project": _taskboard_project_payload(project),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class EmployeeDetailView(APIView):
     def put(self, request, employee_id: str):
         serializer = EmployeeSerializer(data=request.data)
@@ -256,6 +438,61 @@ class ToolsView(DatasetView):
 
 class HistoryView(DatasetView):
     dataset_key = "history"
+
+
+class DatasetUploadView(APIView):
+    dataset_key = ""
+
+    def post(self, request):
+        serializer = DatasetUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        upload = serializer.validated_data["file"]
+        try:
+            parsed = parse_dataset_upload(
+                self.dataset_key,
+                upload.name,
+                upload.read(),
+            )
+        except ValueError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(parsed, status=status.HTTP_200_OK)
+
+
+class EmployeesDatasetUploadView(DatasetUploadView):
+    dataset_key = "employees"
+
+
+class ProjectsDatasetUploadView(DatasetUploadView):
+    dataset_key = "projects"
+
+
+class ToolsDatasetUploadView(DatasetUploadView):
+    dataset_key = "tools"
+
+
+class HistoryDatasetUploadView(DatasetUploadView):
+    dataset_key = "history"
+
+
+class DatasetConfirmView(APIView):
+    def post(self, request):
+        serializer = DatasetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data.get("confirm", True):
+            return Response({"status": "cancelled"}, status=status.HTTP_200_OK)
+        summary = confirm_bulk_rebuild()
+        return Response(summary, status=status.HTTP_200_OK)
+
+
+class DatasetStatusView(APIView):
+    def get(self, request):
+        return Response(get_upload_status(), status=status.HTTP_200_OK)
+
+
+class DatasetReloadView(APIView):
+    def post(self, request):
+        payload = reload_from_database_view()
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class SendAssignmentsView(APIView):
@@ -320,8 +557,24 @@ class TaskBoardRemoveMemberView(APIView):
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
         member_name = str(serializer.validated_data["member"].get("name", ""))
+        member_payload = next(
+            (member for member in (project.team or []) if str(member.get("name")) == member_name),
+            None,
+        )
         project.team = [member for member in (project.team or []) if str(member.get("name")) != member_name]
         project.save(update_fields=["team", "updated_at"])
+
+        if member_payload and bool(member_payload.get("is_outreach")):
+            employee_id = str(member_payload.get("employee_id") or "")
+            if employee_id:
+                delete_outreach_employee(employee_id, outreach_project_id=project.id)
+            _log_activity(
+                "outreach_removed",
+                f"Outreach expert removed from {project.project_name}",
+                member_name,
+                {"project_id": project.id},
+            )
+
         _sync_employee_statuses_safe()
         return Response(_taskboard_project_payload(project), status=status.HTTP_200_OK)
 
@@ -332,6 +585,25 @@ class TaskBoardCompleteView(APIView):
             project = TaskBoardProject.objects.get(id=project_id)
         except TaskBoardProject.DoesNotExist:
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        outreach_members = [member for member in (project.team or []) if bool(member.get("is_outreach"))]
+        for member in outreach_members:
+            send_outreach_farewell_email(
+                {
+                    "name": member.get("name", ""),
+                    "email": member.get("email", ""),
+                    "project_name": project.project_name,
+                }
+            )
+
+        removed = delete_outreach_employees_for_project(project.id)
+        for row in removed:
+            _log_activity(
+                "outreach_auto_removed",
+                "Outreach profile removed after project completion",
+                str(row.get("name", "")),
+                {"project_id": project.id, "employee_id": row.get("employee_id")},
+            )
 
         project.status = "completed"
         project.save(update_fields=["status", "updated_at"])
@@ -402,6 +674,7 @@ def _build_analytics_payload(period: str = "7d") -> dict:
     team_utilization = [
         {"name": row.name.split()[0] if row.name else "Unknown", "workload_percent": row.workload_percent}
         for row in statuses
+        if not row.is_outreach
     ][:30]
 
     # task completion trend (projects completed per day over period)
@@ -439,9 +712,9 @@ def _build_analytics_payload(period: str = "7d") -> dict:
 
     # secondary stats
     datasets = get_datasets()
-    employees_list = datasets.get("employees", [])
+    employees_list = [row for row in datasets.get("employees", []) if not bool(row.get("is_outreach"))]
     tools_list = datasets.get("tools", [])
-    available_count = sum(1 for row in statuses if row.status == "available")
+    available_count = sum(1 for row in statuses if row.status == "available" and not row.is_outreach)
     avg_rating = 0.0
     if employees_list:
         ratings = [float(e.get("performance_rating", 0) or 0) for e in employees_list]
@@ -458,6 +731,8 @@ def _build_analytics_payload(period: str = "7d") -> dict:
     emp_map = {str(e.get("name", "")).strip(): e for e in employees_list}
     leaderboard = []
     for row in statuses:
+        if row.is_outreach:
+            continue
         emp = emp_map.get(row.name, {})
         leaderboard.append({
             "name": row.name,

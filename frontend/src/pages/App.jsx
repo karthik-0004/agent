@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   addEmployee,
+  addOutreachEmployee,
   addTaskBoardMember,
   completeTaskBoardProject,
   createTaskBoardProject,
@@ -14,13 +15,16 @@ import {
   getTaskBoard,
   getTools,
   removeTaskBoardMember,
+  runCustomMission,
   runAgent,
   sendAssignments,
   updateEmployee,
 } from '../api/agentApi';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
+import DatasetManager from '../components/DatasetManager';
 import EmployeeDirectory from '../components/EmployeeDirectory';
 import Orchestrator from '../components/Orchestrator';
+import OutreachForm from '../components/OutreachForm';
 import Sidebar from '../components/Sidebar';
 import TaskBoard from '../components/TaskBoard';
 import TeamLoad from '../components/TeamLoad';
@@ -169,6 +173,7 @@ const App = () => {
   const [tools, setTools] = useState([]);
   const [description, setDescription] = useState('');
   const [teamSize, setTeamSize] = useState(3);
+  const [deadlineDays, setDeadlineDays] = useState(14);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [plan, setPlan] = useState(null);
@@ -185,6 +190,8 @@ const App = () => {
   const [sendingEmails, setSendingEmails] = useState(false);
   const [emailToast, setEmailToast] = useState(null);
   const [addMemberTarget, setAddMemberTarget] = useState(null);
+  const [addMemberMode, setAddMemberMode] = useState('chooser');
+  const [addingOutreach, setAddingOutreach] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedAddMember, setSelectedAddMember] = useState(null);
   const [taskBoardNotice, setTaskBoardNotice] = useState(null);
@@ -193,6 +200,7 @@ const App = () => {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsPeriod, setAnalyticsPeriod] = useState('7d');
   const [leaderboardSort, setLeaderboardSort] = useState('rating');
+  const [customMissionAnalysis, setCustomMissionAnalysis] = useState(null);
 
   const loadCoreData = async () => {
     const [employeeData, statusData, projectData, historyData, toolData, taskboardData] = await Promise.all([
@@ -214,6 +222,12 @@ const App = () => {
     }
   };
 
+  const loadEmployeesOnly = async () => {
+    const [employeeData, statusData] = await Promise.all([getEmployees(), getEmployeeStatuses()]);
+    setEmployees(employeeData);
+    setEmployeeStatuses(statusData);
+  };
+
   const loadAnalyticsData = async (period = analyticsPeriod) => {
     setAnalyticsLoading(true);
     try {
@@ -230,6 +244,15 @@ const App = () => {
   useEffect(() => {
     loadCoreData().catch((requestError) => setError(requestError.message));
     loadAnalyticsData();
+  }, []);
+
+  useEffect(() => {
+    const handleBulkSync = () => {
+      loadCoreData().catch((requestError) => setError(requestError.message));
+      loadAnalyticsData();
+    };
+    window.addEventListener('neurax:bulk-sync-complete', handleBulkSync);
+    return () => window.removeEventListener('neurax:bulk-sync-complete', handleBulkSync);
   }, []);
 
   useEffect(() => {
@@ -281,6 +304,7 @@ const App = () => {
     const assignedNames = new Set((addMemberTarget.team || []).map((member) => member.name));
     const query = memberSearch.trim().toLowerCase();
     return employees
+      .filter((employee) => !employee.is_outreach)
       .filter((employee) => !assignedNames.has(employee.name))
       .filter((employee) => {
         if (!query) {
@@ -308,6 +332,56 @@ const App = () => {
 
   const handleLeaderboardSort = (col) => setLeaderboardSort(col);
 
+  const handleCustomMissionAnalyze = async (payload) => {
+    setLoading(true);
+    setError('');
+    setTeamConfirmed(false);
+    setEmailToast(null);
+    try {
+      const response = await runCustomMission({
+        action: 'analyze',
+        ...payload,
+      });
+      setCustomMissionAnalysis(response.analysis || null);
+      setPlan(null);
+      setAssignedTeam([]);
+      setTeamConflicts([]);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCustomMissionPlan = async (payload) => {
+    setLoading(true);
+    setError('');
+    setTeamConfirmed(false);
+    setEmailToast(null);
+    try {
+      const response = await runCustomMission({
+        action: 'plan',
+        ...payload,
+      });
+      const planned = response.plan || null;
+      setPlan(planned);
+      setAssignedTeam((planned?.assigned_team || []).slice(0, payload.team_size || teamSize));
+      setTeamConflicts(planned?.team_conflicts || []);
+      setConflictsResolved((planned?.team_conflicts || []).length === 0);
+      if (response.saved_project) {
+        await loadCoreData();
+      }
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetCustomMissionAnalysis = () => {
+    setCustomMissionAnalysis(null);
+  };
+
   const handleRunPlan = async (avoidConflicts = false, tokenOverride = null) => {
     setLoading(true);
     setError('');
@@ -315,8 +389,9 @@ const App = () => {
     setEmailToast(null);
     try {
       const token = tokenOverride === null ? reshuffleToken : tokenOverride;
-      const response = await runAgent(description, teamSize, token, avoidConflicts);
+      const response = await runAgent(description, teamSize, deadlineDays, token, avoidConflicts);
       setPlan(response);
+      setCustomMissionAnalysis(null);
       setAssignedTeam((response.assigned_team || []).slice(0, teamSize));
       setTeamConflicts(response.team_conflicts || []);
       setConflictsResolved((response.team_conflicts || []).length === 0 || avoidConflicts);
@@ -335,8 +410,9 @@ const App = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await runAgent(description, teamSize, nextToken, false);
+      const response = await runAgent(description, teamSize, deadlineDays, nextToken, false);
       setPlan(response);
+      setCustomMissionAnalysis(null);
       setAssignedTeam((response.assigned_team || []).slice(0, teamSize));
       setTeamConflicts(response.team_conflicts || []);
       setConflictsResolved((response.team_conflicts || []).length === 0);
@@ -430,6 +506,7 @@ const App = () => {
 
   const handleAddMember = (bucket) => {
     setAddMemberTarget(bucket);
+    setAddMemberMode('chooser');
     setMemberSearch('');
     setSelectedAddMember(null);
     setTaskBoardNotice(null);
@@ -442,10 +519,13 @@ const App = () => {
 
     try {
       await addTaskBoardMember(addMemberTarget.id, {
+        employee_id: selectedAddMember.employee_id,
         name: selectedAddMember.name,
         email: selectedAddMember.email,
         role: selectedAddMember.role,
         current_workload_percent: selectedAddMember.current_workload_percent,
+        source: selectedAddMember.source || 'imported',
+        is_outreach: false,
       });
 
       const sendResult = await sendAssignments({
@@ -481,11 +561,44 @@ const App = () => {
       }
 
       setAddMemberTarget(null);
+      setAddMemberMode('chooser');
       setSelectedAddMember(null);
       setMemberSearch('');
       await loadCoreData();
     } catch (requestError) {
       setError(requestError.message);
+    }
+  };
+
+  const handleAddOutreachMember = async (form) => {
+    if (!addMemberTarget) {
+      return;
+    }
+
+    setAddingOutreach(true);
+    try {
+      const response = await addOutreachEmployee({
+        ...form,
+        project_id: addMemberTarget.id,
+      });
+
+      const outreach = response?.employee;
+      if (outreach?.email) {
+        setTaskBoardNotice({
+          type: 'success',
+          message: `Outreach expert ${outreach.name} added and notified via email.`,
+        });
+      }
+
+      setAddMemberTarget(null);
+      setAddMemberMode('chooser');
+      setSelectedAddMember(null);
+      setMemberSearch('');
+      await loadCoreData();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setAddingOutreach(false);
     }
   };
 
@@ -508,7 +621,7 @@ const App = () => {
       } else {
         await addEmployee(payload);
       }
-      await loadCoreData();
+      await loadEmployeesOnly();
       setEditingEmployee(null);
       setActiveView('employees');
     } catch (requestError) {
@@ -558,6 +671,8 @@ const App = () => {
           projects={projects}
           teamSize={teamSize}
           onTeamSizeChange={setTeamSize}
+          deadlineDays={deadlineDays}
+          onDeadlineDaysChange={(value) => setDeadlineDays(Math.max(1, Math.min(365, value || 1)))}
           plan={plan}
           assignedTeam={assignedTeam}
           teamConflicts={teamConflicts}
@@ -570,6 +685,10 @@ const App = () => {
           sendingEmails={sendingEmails}
           emailToast={emailToast}
           error={error}
+          onRunCustomAnalyze={handleCustomMissionAnalyze}
+          onRunCustomPlan={handleCustomMissionPlan}
+          customMissionAnalysis={customMissionAnalysis}
+          onResetCustomMissionAnalysis={handleResetCustomMissionAnalysis}
         />
       );
     }
@@ -659,7 +778,11 @@ const App = () => {
           </div>
           <div className="dataset-grid">
             {[...completedBuckets, ...history].map((project, index) => {
-              const members = splitValues(project.team_members || (project.team || []).map((member) => member.name).join(';')).slice(0, 5);
+              const teamMembers = Array.isArray(project.team) && project.team.length
+                ? project.team.slice(0, 5).map((member) => ({
+                  label: `${member.is_outreach ? '🌐 ' : ''}${member.name}${member.is_outreach ? ' (Outreach)' : ''}`,
+                }))
+                : splitValues(project.team_members || '').slice(0, 5).map((name) => ({ label: name }));
               return (
                 <ExpandableProjectCard key={`${project.id || project.history_id || project.project_name}-${index}`} project={project} badge="Completed" dotTone="red">
                   <p className="dataset-meta">{project.summary || project.lessons_learned || 'Completed project.'}</p>
@@ -667,9 +790,9 @@ const App = () => {
                     <span className="chip neutral">Outcome: {project.outcome || 'Successful'}</span>
                   </div>
                   <div className="chip-row dense">
-                    {members.map((memberName, memberIndex) => (
-                      <span key={`${project.project_name}-${memberName}`} className="chip blue">
-                        {memberName} - C{memberIndex + 1}
+                    {teamMembers.map((member, memberIndex) => (
+                      <span key={`${project.project_name}-${member.label}-${memberIndex}`} className="chip blue">
+                        {member.label} - C{memberIndex + 1}
                       </span>
                     ))}
                   </div>
@@ -685,6 +808,18 @@ const App = () => {
       return <ToolsCatalog tools={tools} />;
     }
 
+    if (activeView === 'dataset-manager') {
+      return (
+        <DatasetManager
+          stats={{
+            employees: employees.filter((employee) => !employee.is_outreach).length,
+            projects: projects.length,
+            tools: tools.length,
+          }}
+        />
+      );
+    }
+
     return null;
   };
 
@@ -698,7 +833,7 @@ const App = () => {
             <h2 className="page-title">{activeView.replace('-', ' ')}</h2>
           </div>
           <div className="topbar-meta">
-            <span>{employees.length} employees</span>
+            <span>{employees.filter((employee) => !employee.is_outreach).length} employees</span>
             <span>{projects.length} projects</span>
             <span>{tools.length} tools</span>
           </div>
@@ -711,50 +846,83 @@ const App = () => {
             <div className="modal-card">
               <div className="section-header compact">
                 <div>
-                  <p className="section-title">Add Member</p>
+                  <p className="section-title">Add Member to Project</p>
                   <p className="section-subtitle">{addMemberTarget.project_name}</p>
                 </div>
               </div>
 
-              <input
-                className="search-input"
-                placeholder="Search by name, role, or email"
-                value={memberSearch}
-                onChange={(event) => setMemberSearch(event.target.value)}
-              />
-
-              <div className="modal-member-list">
-                {addMemberOptions.map((employee) => (
-                  <button
-                    key={employee.employee_id || employee.name}
-                    type="button"
-                    className={selectedAddMember?.name === employee.name ? 'modal-member-row active' : 'modal-member-row'}
-                    onClick={() => setSelectedAddMember(employee)}
-                  >
-                    <div>
-                      <p className="employee-name">{employee.name}</p>
-                      <p className="employee-role">{employee.role}</p>
-                    </div>
-                    <span className="dataset-meta">{employee.email}</span>
+              {addMemberMode === 'chooser' ? (
+                <div className="member-mode-grid">
+                  <button type="button" className="member-mode-card" onClick={() => setAddMemberMode('team')}>
+                    <p className="section-title small">👥 From Team</p>
+                    <p className="dataset-meta">Add someone already in the company employee list.</p>
                   </button>
-                ))}
-                {!addMemberOptions.length ? <p className="empty-state">No matching employee found.</p> : null}
-              </div>
+                  <button type="button" className="member-mode-card" onClick={() => setAddMemberMode('outreach')}>
+                    <p className="section-title small">🌐 Outreach Expert</p>
+                    <p className="dataset-meta">Bring in an outside freelancer temporarily.</p>
+                  </button>
+                </div>
+              ) : null}
+
+              {addMemberMode === 'team' ? (
+                <>
+                  <input
+                    className="search-input"
+                    placeholder="Search by name, role, or email"
+                    value={memberSearch}
+                    onChange={(event) => setMemberSearch(event.target.value)}
+                  />
+
+                  <div className="modal-member-list">
+                    {addMemberOptions.map((employee) => (
+                      <button
+                        key={employee.employee_id || employee.name}
+                        type="button"
+                        className={selectedAddMember?.name === employee.name ? 'modal-member-row active' : 'modal-member-row'}
+                        onClick={() => setSelectedAddMember(employee)}
+                      >
+                        <div>
+                          <p className="employee-name">{employee.name}</p>
+                          <p className="employee-role">{employee.role}</p>
+                        </div>
+                        <span className="dataset-meta">{employee.email}</span>
+                      </button>
+                    ))}
+                    {!addMemberOptions.length ? <p className="empty-state">No matching employee found.</p> : null}
+                  </div>
+
+                  <div className="card-actions">
+                    <button type="button" className="primary-button" disabled={!selectedAddMember} onClick={handleConfirmAddMember}>
+                      Add + Send Email
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => setAddMemberMode('chooser')}>
+                      Back
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
+              {addMemberMode === 'outreach' ? (
+                <OutreachForm
+                  projectName={addMemberTarget.project_name}
+                  onSubmit={handleAddOutreachMember}
+                  onCancel={() => setAddMemberMode('chooser')}
+                  busy={addingOutreach}
+                />
+              ) : null}
 
               <div className="card-actions">
-                <button type="button" className="primary-button" disabled={!selectedAddMember} onClick={handleConfirmAddMember}>
-                  Add + Send Email
-                </button>
                 <button
                   type="button"
                   className="secondary-button"
                   onClick={() => {
                     setAddMemberTarget(null);
+                    setAddMemberMode('chooser');
                     setSelectedAddMember(null);
                     setMemberSearch('');
                   }}
                 >
-                  Cancel
+                  Close
                 </button>
               </div>
             </div>

@@ -26,19 +26,23 @@ const request = async (runner) => {
   }
 };
 
-export const runAgent = (description, teamSize, reshuffleToken = 0, avoidConflicts = false) =>
+export const runAgent = (description, teamSize, deadlineDays, reshuffleToken = 0, avoidConflicts = false) =>
   request(() =>
     api.post('/agent/run/', {
       project_description: description,
       team_size: teamSize,
+      deadline_days: deadlineDays,
       reshuffle_token: reshuffleToken,
       avoid_conflicts: avoidConflicts,
     })
   );
 
+export const runCustomMission = (payload) => request(() => api.post('/agent/custom-mission/', payload));
+
 export const getEmployees = () => request(() => api.get('/employees/'));
 export const createEmployee = (employee) => request(() => api.post('/employees/', employee));
 export const addEmployee = (employee) => request(() => api.post('/employees/add/', employee));
+export const addOutreachEmployee = (payload) => request(() => api.post('/employees/add-outreach/', payload));
 export const updateEmployee = (employeeId, employee) =>
   request(() => api.put(`/employees/${employeeId}/`, employee));
 export const deleteEmployee = (employeeId) => request(() => api.delete(`/employees/${employeeId}/`));
@@ -69,5 +73,26 @@ export const completeTaskBoardProject = (projectId) =>
 
 export const getAnalytics = (period = '7d') => request(() => api.get(`/analytics/?period=${period}`));
 export const getActivities = () => request(() => api.get('/activities/'));
+
+const uploadDatasetFile = (dataset, file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request(() =>
+    api.post(`/datasets/upload/${dataset}/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  );
+};
+
+export const uploadEmployeesDataset = (file) => uploadDatasetFile('employees', file);
+export const uploadProjectsDataset = (file) => uploadDatasetFile('projects', file);
+export const uploadToolsDataset = (file) => uploadDatasetFile('tools', file);
+export const uploadHistoryDataset = (file) => uploadDatasetFile('history', file);
+
+export const confirmDatasetRebuild = () => request(() => api.post('/datasets/confirm/', { confirm: true }));
+export const getDatasetStatus = () => request(() => api.get('/datasets/status/'));
+export const forceDatasetReload = () => request(() => api.post('/datasets/reload/', {}));
 
 export default api;

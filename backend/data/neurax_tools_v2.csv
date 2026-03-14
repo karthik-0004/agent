@@ -1,101 +1,56 @@
-tool_id,tool_name,tool_type,category,purpose,supported_languages,pricing_tier,docs_url,integration_complexity,popularity_score
-T001,OpenAI API,LLM API,AI/ML,GPT-4 and embeddings for NL generation and reasoning,"Python;Node.js;REST",Enterprise,https://platform.openai.com/docs,Low,9.8
-T002,Anthropic Claude API,LLM API,AI/ML,Claude models for reasoning, code gen, and analysis,"Python;Node.js;REST",Enterprise,https://docs.anthropic.com,Low,9.5
-T003,Hugging Face,Model Hub,AI/ML,Open-source transformer models and fine-tuning pipelines,"Python;REST",Free/Pro,https://huggingface.co/docs,Medium,9.2
-T004,LangChain,AI Framework,AI/ML,Agent orchestration, RAG pipelines, and tool chaining,"Python;JavaScript",Open Source,https://docs.langchain.com,Medium,8.9
-T005,Pinecone,Vector Database,AI/ML,High-performance semantic search and embedding storage,"Python;Node.js;REST",Pro,https://docs.pinecone.io,Low,8.4
-T006,Weaviate,Vector Database,AI/ML,Open-source vector DB with GraphQL and hybrid search,"Python;Go;REST",Open Source,https://weaviate.io/developers/weaviate,Medium,7.8
-T007,MLflow,ML Lifecycle,AI/ML,Experiment tracking, model registry, and deployment,"Python",Open Source,https://mlflow.org/docs,Medium,8.6
-T008,Weights & Biases,ML Monitoring,AI/ML,Experiment tracking, hyperparameter sweeps, model comparison,"Python",Pro,https://docs.wandb.ai,Low,8.7
-T009,Apache Airflow,Workflow Orchestration,Data,DAG-based data pipeline scheduling and monitoring,"Python",Open Source,https://airflow.apache.org/docs,High,8.8
-T010,dbt,Data Transformation,Data,SQL-based data modelling and transformation in the warehouse,"SQL;Python",Open Source,https://docs.getdbt.com,Medium,9.0
-T011,Apache Kafka,Streaming Platform,Data,Real-time event streaming and message queue at scale,"Java;Python;Go",Open Source,https://kafka.apache.org/documentation,High,9.1
-T012,Snowflake,Cloud Data Warehouse,Data,Cloud-native analytical data warehouse with auto-scaling,"SQL;Python",Enterprise,https://docs.snowflake.com,Medium,9.3
-T013,Databricks,Unified Analytics,Data,Lakehouse platform for ML, SQL, and streaming workloads,"Python;SQL;Scala",Enterprise,https://docs.databricks.com,High,9.0
-T014,Tableau,BI Visualisation,Data,Interactive dashboards and visual analytics for business users,"SQL;Python",Pro,https://help.tableau.com,Low,8.9
-T015,Power BI,BI Platform,Data,Microsoft business intelligence and reporting platform,"DAX;SQL;M",Pro,https://learn.microsoft.com/power-bi,Low,8.7
-T016,PostgreSQL,Relational Database,Backend,Open-source relational DB with advanced indexing and full-text search,"SQL",Open Source,https://www.postgresql.org/docs,Medium,9.5
-T017,Redis,In-Memory Cache,Backend,High-performance caching, pub/sub, and session management,"Python;Node.js;Go",Open Source,https://redis.io/docs,Low,9.4
-T018,GraphQL,API Layer,Backend,Flexible query language for APIs with strong typing,"JavaScript;Python;Go",Open Source,https://graphql.org/learn,Medium,8.6
-T019,Terraform,IaC,Infrastructure,Infrastructure as code for multi-cloud provisioning,"HCL",Open Source,https://developer.hashicorp.com/terraform,Medium,9.2
-T020,Kubernetes,Container Orchestration,Infrastructure,Container orchestration, scaling, and deployment management,"YAML;Go",Open Source,https://kubernetes.io/docs,High,9.6
-T021,Prometheus,Monitoring,Infrastructure,Time-series metrics collection and alerting for microservices,"Go;Python",Open Source,https://prometheus.io/docs,Medium,8.9
-T022,Grafana,Observability,Infrastructure,Dashboards for metrics, logs, and traces across infrastructure,"Any",Open Source,https://grafana.com/docs,Low,9.1
-T023,GitHub Actions,CI/CD,DevOps,Native CI/CD pipeline automation integrated with GitHub repos,"YAML;Any",Free/Pro,https://docs.github.com/actions,Low,9.3
-T024,Docker,Containerisation,DevOps,Container packaging for consistent environments across dev and prod,"Any",Open Source,https://docs.docker.com,Low,9.7
-T025,Snyk,Security Scanning,Security,Automated vulnerability detection in code, containers, and IaC,"Any",Pro,https://docs.snyk.io,Low,8.5
-T026,Selenium,Test Automation,QA,Browser automation for end-to-end UI testing,"Python;Java;JS",Open Source,https://www.selenium.dev/documentation,Medium,8.8
-T027,Playwright,Test Automation,QA,Modern cross-browser end-to-end testing framework,"Python;JS;TS",Open Source,https://playwright.dev/docs,Low,9.2
-T028,Figma,Design,Product,Collaborative UI/UX design and prototyping tool,"N/A",Pro,https://help.figma.com,Low,9.4
-T029,Notion,Documentation,Operations,Team wiki, project docs, and knowledge management,"N/A",Pro,https://www.notion.so/help,Low,8.6
-T030,Jira,Project Management,Operations,Agile project tracking, sprint planning, and bug management,"N/A",Pro,https://support.atlassian.com/jira,Low,9.0
-T031,FastAPI,API Framework,Backend,High-performance Python API framework for building production REST and async APIs,Python,Open Source,https://fastapi.tiangolo.com,Low,9.3
-T032,Celery,Task Queue,Backend,Distributed task queue for async job processing and scheduling in Python,Python,Open Source,https://docs.celeryq.dev,Medium,8.4
-T033,Apache Spark,Big Data Processing,Data,Unified analytics engine for large-scale data processing and ML workloads,"Python;Scala;Java",Open Source,https://spark.apache.org/docs,High,9.1
-T034,Delta Lake,Table Format,Data,Open table format providing ACID transactions and scalable metadata for data lakes,"Python;Scala;SQL",Open Source,https://docs.delta.io,Medium,8.7
-T035,Fivetran,Data Integration,Data,Automated data movement connectors for cloud data warehouses,"SQL;Python",Enterprise,https://fivetran.com/docs,Low,8.8
-T036,Great Expectations,Data Quality,Data,Open-source data validation and profiling framework for data pipelines,Python,Open Source,https://docs.greatexpectations.io,Medium,8.3
-T037,Metabase,BI Tool,Data,Open-source BI and analytics tool for self-serve data exploration,SQL,Open Source,https://www.metabase.com/docs,Low,8.5
-T038,Looker,BI Platform,Data,Google Cloud BI platform for semantic modelling and embedded analytics,"SQL;LookML",Enterprise,https://cloud.google.com/looker/docs,Medium,8.6
-T039,Airbyte,Data Integration,Data,Open-source ELT data integration platform with 300+ connectors,"Python;REST",Open Source,https://docs.airbyte.com,Medium,8.4
-T040,ClickHouse,OLAP Database,Data,Column-oriented database for high-performance analytical queries at scale,SQL,Open Source,https://clickhouse.com/docs,Medium,9.0
-T041,Neo4j,Graph Database,AI/ML,"Leading graph database for knowledge graphs, recommendations, and network analysis","Python;Java;Cypher",Free/Pro,https://neo4j.com/docs,Medium,8.6
-T042,ChromaDB,Vector Database,AI/ML,Lightweight open-source vector database for AI embeddings and semantic search,Python,Open Source,https://docs.trychroma.com,Low,8.7
-T043,Qdrant,Vector Database,AI/ML,High-performance vector similarity search engine with filtering and payload support,"Python;Rust;REST",Open Source,https://qdrant.tech/documentation,Low,8.8
-T044,LlamaIndex,AI Framework,AI/ML,Data framework for LLM applications connecting custom data sources to LLMs,Python,Open Source,https://docs.llamaindex.ai,Medium,9.0
-T045,Groq,LLM API,AI/ML,Ultra-fast inference API for open-source LLMs using custom LPU hardware,"Python;REST",Pro,https://console.groq.com/docs,Low,8.9
-T046,Ollama,Local LLM,AI/ML,Run open-source LLMs locally with a simple API for privacy-first applications,"Python;REST",Open Source,https://github.com/ollama/ollama,Low,8.8
-T047,vLLM,LLM Serving,AI/ML,High-throughput and memory-efficient LLM serving engine using PagedAttention,Python,Open Source,https://docs.vllm.ai,Medium,9.0
-T048,Ray,Distributed Computing,AI/ML,Unified framework for scaling AI and Python applications across clusters,Python,Open Source,https://docs.ray.io,High,8.7
-T049,Comet ML,ML Tracking,AI/ML,Experiment management and model production monitoring platform,Python,Pro,https://www.comet.com/docs,Low,8.2
-T050,BentoML,ML Serving,AI/ML,Unified model serving framework simplifying ML deployment to any cloud,Python,Open Source,https://docs.bentoml.com,Medium,8.4
-T051,Vault,Secrets Management,Security,"HashiCorp tool for secrets storage, dynamic credentials, and data encryption",Any,Open Source,https://developer.hashicorp.com/vault,Medium,9.1
-T052,Trivy,Security Scanner,Security,"Comprehensive vulnerability scanner for containers, IaC, and filesystems",Any,Open Source,https://trivy.dev,Low,8.9
-T053,SonarQube,Code Quality,Security,"Continuous inspection platform detecting bugs, code smells, and vulnerabilities",Any,Free/Pro,https://docs.sonarqube.org,Low,8.7
-T054,OPA,Policy Engine,Security,Open Policy Agent for fine-grained access control and compliance enforcement,Rego,Open Source,https://www.openpolicyagent.org/docs,Medium,8.5
-T055,Checkov,IaC Scanner,Security,"Static analysis for Terraform, CloudFormation, and Kubernetes security",Python,Open Source,https://www.checkov.io/1.Welcome/What-is-Checkov.html,Low,8.6
-T056,Pulumi,IaC,Infrastructure,Cloud infrastructure as code using real programming languages,"Python;TypeScript;Go",Open Source,https://www.pulumi.com/docs,Medium,8.8
-T057,ArgoCD,GitOps,DevOps,Declarative GitOps continuous delivery tool for Kubernetes,YAML,Open Source,https://argo-cd.readthedocs.io,Medium,9.1
-T058,Flux CD,GitOps,DevOps,GitOps toolkit for Kubernetes keeping clusters in sync with Git,YAML,Open Source,https://fluxcd.io/docs,Medium,8.6
-T059,Helmfile,Helm Management,DevOps,Declarative spec for deploying and managing Helm charts,YAML,Open Source,https://helmfile.readthedocs.io,Medium,8.3
-T060,Crossplane,Cloud Control,Infrastructure,Kubernetes-native universal control plane for cloud resource management,YAML,Open Source,https://docs.crossplane.io,High,8.4
-T061,Loki,Log Aggregation,Infrastructure,Horizontally scalable log aggregation system from Grafana Labs,Any,Open Source,https://grafana.com/docs/loki,Low,9.0
-T062,Tempo,Distributed Tracing,Infrastructure,"Grafana Tempo: scalable, cost-effective distributed tracing backend",Any,Open Source,https://grafana.com/docs/tempo,Low,8.7
-T063,OpenTelemetry,Observability,Infrastructure,"Vendor-neutral observability framework for traces, metrics, and logs",Any,Open Source,https://opentelemetry.io/docs,Medium,9.2
-T064,Chaos Toolkit,Chaos Engineering,Infrastructure,Open-source tool for running chaos engineering experiments,Python,Open Source,https://docs.chaostoolkit.org,Medium,8.1
-T065,k6,Performance Testing,QA,"Modern load testing tool for APIs, microservices, and websites",JavaScript,Open Source,https://k6.io/docs,Low,9.0
-T066,Cypress,E2E Testing,QA,"Fast, reliable end-to-end testing framework for web applications","JavaScript;TypeScript",Open Source,https://docs.cypress.io,Low,9.1
-T067,Robot Framework,Test Automation,QA,Generic automation framework for acceptance testing and RPA,"Python;Robot",Open Source,https://robotframework.org/robotframework,Medium,8.5
-T068,JMeter,Load Testing,QA,Java-based tool for performance testing APIs and web apps under load,"Java;XML",Open Source,https://jmeter.apache.org,Medium,8.6
-T069,Storybook,Component Dev,Product,Frontend workshop for building UI components in isolation,"JavaScript;TypeScript",Open Source,https://storybook.js.org/docs,Low,9.0
-T070,Vercel,Frontend Deployment,DevOps,Deployment and hosting platform optimised for Next.js and React,JavaScript,Free/Pro,https://vercel.com/docs,Low,9.3
-T071,Supabase,Backend as a Service,Backend,"Open-source Firebase alternative with PostgreSQL, auth, and storage","Python;JavaScript",Open Source,https://supabase.com/docs,Low,9.1
-T072,PlanetScale,Serverless MySQL,Backend,Serverless MySQL platform with horizontal sharding and non-blocking schema changes,SQL,Pro,https://planetscale.com/docs,Low,8.7
-T073,Prisma,ORM,Backend,Next-generation ORM for Node.js and TypeScript with type safety,"TypeScript;JavaScript",Open Source,https://www.prisma.io/docs,Low,9.0
-T074,tRPC,API Layer,Backend,End-to-end typesafe APIs for TypeScript full-stack applications,TypeScript,Open Source,https://trpc.io/docs,Low,8.8
-T075,Temporal,Workflow Engine,Backend,Durable execution system for writing reliable distributed workflows,"Python;Go;Java",Open Source,https://docs.temporal.io,High,8.9
-T076,Stripe,Payments,Backend,Developer-first payment processing API for online and in-person payments,"Python;Node.js;REST",Enterprise,https://stripe.com/docs,Low,9.5
-T077,Twilio,Communications,Backend,"Cloud communications platform for SMS, voice, email, and WhatsApp APIs","Python;Node.js;REST",Pro,https://www.twilio.com/docs,Low,9.1
-T078,Firebase,BaaS,Mobile,"Google mobile development platform with realtime database, auth, and hosting","JavaScript;Swift;Kotlin",Free/Pro,https://firebase.google.com/docs,Low,9.2
-T079,Expo,Mobile Dev,Mobile,Open-source platform for universal React Native apps on iOS and Android,"JavaScript;TypeScript",Free/Pro,https://docs.expo.dev,Low,8.9
-T080,Fastlane,Mobile CI/CD,Mobile,"Automate iOS and Android app deployment, screenshots, and testing",Ruby,Open Source,https://docs.fastlane.tools,Low,8.7
-T081,Amplitude,Product Analytics,Product,Digital analytics platform for understanding user behaviour and product metrics,"JavaScript;Python",Pro,https://www.docs.developers.amplitude.com,Low,9.0
-T082,Mixpanel,Product Analytics,Product,Self-serve product analytics for tracking events and user journeys,"JavaScript;Python",Pro,https://developer.mixpanel.com/docs,Low,8.8
-T083,LaunchDarkly,Feature Flags,Product,"Feature flag management platform for safe, targeted deployments",Any,Pro,https://docs.launchdarkly.com,Low,8.9
-T084,PostHog,Product Analytics,Product,"Open-source product analytics, session recording, and feature flags platform","JavaScript;Python",Open Source,https://posthog.com/docs,Low,9.0
-T085,Miro,Collaboration,Operations,"Online collaborative whiteboard for brainstorming, planning, and design thinking",N/A,Pro,https://help.miro.com,Low,8.8
-T086,Linear,Project Management,Operations,Modern issue tracking and project management tool for high-velocity teams,N/A,Pro,https://linear.app/docs,Low,8.9
-T087,Confluence,Documentation,Operations,Team collaboration and wiki platform integrated with Jira,N/A,Pro,https://support.atlassian.com/confluence,Low,8.7
-T088,Slack,Communication,Operations,Business messaging platform with workflow automation and app integrations,N/A,Pro,https://api.slack.com,Low,9.4
-T089,Datadog,Monitoring,Infrastructure,"Cloud monitoring and security platform for metrics, logs, and APM",Any,Enterprise,https://docs.datadoghq.com,Low,9.2
-T090,New Relic,APM,Infrastructure,Full-stack observability platform for application performance monitoring,Any,Pro,https://docs.newrelic.com,Low,8.8
-T091,PagerDuty,Incident Management,Infrastructure,Digital operations management platform for on-call and incident response,Any,Pro,https://support.pagerduty.com,Low,9.1
-T092,AWS Lambda,Serverless,Infrastructure,Serverless compute service for running functions without managing servers,"Python;Node.js;Go;Java",Enterprise,https://docs.aws.amazon.com/lambda,Low,9.4
-T093,GCP Vertex AI,ML Platform,AI/ML,"Google Cloud's unified ML platform for building, deploying, and scaling AI",Python,Enterprise,https://cloud.google.com/vertex-ai/docs,Medium,9.0
-T094,Azure ML,ML Platform,AI/ML,Microsoft Azure machine learning platform for end-to-end ML lifecycle management,Python,Enterprise,https://learn.microsoft.com/azure/machine-learning,Medium,8.8
-T095,SageMaker,ML Platform,AI/ML,"AWS fully managed service for building, training, and deploying ML models",Python,Enterprise,https://docs.aws.amazon.com/sagemaker,Medium,8.9
-T096,Langfuse,LLM Observability,AI/ML,Open-source observability and analytics for LLM applications and prompts,"Python;JavaScript",Open Source,https://langfuse.com/docs,Low,8.7
-T097,Trulens,LLM Evaluation,AI/ML,Evaluation and tracking library for LLM-based applications with RAG triad,Python,Open Source,https://www.trulens.org/trulens_eval,Low,8.4
-T098,Portkey,LLM Gateway,AI/ML,"AI gateway providing routing, reliability, and observability for LLM APIs","Python;REST",Pro,https://portkey.ai/docs,Low,8.6
-T099,DVC,ML Data Version Control,AI/ML,Data version control and ML experiment tracking for reproducible pipelines,Python,Open Source,https://dvc.org/doc,Medium,8.5
-T100,Evidently,ML Monitoring,AI/ML,Open-source ML and LLM monitoring framework for data and model quality,Python,Open Source,https://docs.evidentlyai.com,Low,8.6
+name,category,purpose_keywords,supported_skills,source,tool_id
+OpenAI API,LLM API,Natural language reasoning and generation,,imported,
+Pinecone,Vector Database,RAG and semantic search,,imported,
+PostgreSQL,Database,Structured relational data storage,,imported,
+Google Search API,Search Engine,External information retrieval,,imported,
+LangChain,AI Framework,Agent orchestration and tool integration,,imported,
+Anthropic Claude API,LLM API,"Advanced reasoning, code generation, and long-context tasks",,imported,
+LangChain,AI Framework,"Chain LLM calls, tools, and memory into agentic workflows",,imported,
+LlamaIndex,AI Framework,Index and query documents for LLM-powered retrieval,,imported,
+Hugging Face Hub,Model Registry,Access and deploy open-source ML models and datasets,,imported,
+Weaviate,Vector Database,Open-source vector DB for semantic search and RAG,,imported,
+Chroma,Vector Database,Lightweight embeddable vector store for LLM applications,,imported,
+Qdrant,Vector Database,High-performance vector similarity search engine,,imported,
+MLflow,MLOps,"Track ML experiments, package models, and manage deployments",,imported,
+Weights & Biases,MLOps,"Experiment tracking, model versioning, and visualisation",,imported,
+Apache Airflow,Orchestration,Schedule and monitor complex data pipeline workflows,,imported,
+Prefect,Orchestration,Modern Python-native orchestration for data workflows,,imported,
+dbt,Data Transformation,SQL-first data transformation for analytics pipelines,,imported,
+Apache Kafka,Streaming,Distributed event streaming for real-time data pipelines,,imported,
+Apache Spark,Big Data,Large-scale distributed data processing and analytics,,imported,
+Snowflake,Data Warehouse,Cloud data warehouse for scalable analytics workloads,,imported,
+BigQuery,Data Warehouse,Google serverless data warehouse for massive-scale SQL analytics,,imported,
+Databricks,Data Platform,Unified analytics platform built on Apache Spark,,imported,
+FastAPI,Web Framework,High-performance async Python framework for building APIs,,imported,
+Docker,Containerisation,Package and run applications in isolated containers,,imported,
+Kubernetes,Container Orchestration,Automate deployment and scaling of containerised applications,,imported,
+Terraform,Infrastructure as Code,Provision and manage cloud infrastructure declaratively,,imported,
+AWS SageMaker,Cloud ML,Managed end-to-end ML platform on AWS,,imported,
+Google Vertex AI,Cloud ML,Google Cloud managed ML training and serving platform,,imported,
+Azure ML,Cloud ML,Microsoft managed ML service with AutoML capabilities,,imported,
+Grafana,Monitoring,"Visualise metrics, logs, and traces in real-time dashboards",,imported,
+Prometheus,Monitoring,Time-series metrics collection and alerting for systems,,imported,
+Elasticsearch,Search,Distributed full-text search and analytics engine,,imported,
+Redis,Cache,In-memory key-value store for caching and session management,,imported,
+MongoDB,NoSQL Database,Flexible document-oriented database for unstructured data,,imported,
+GitHub Actions,CI/CD,"Automate build, test, and deploy workflows on GitHub",,imported,
+ArgoCD,GitOps,Declarative continuous delivery for Kubernetes applications,,imported,
+Helm,Package Manager,Manage Kubernetes application deployments with charts,,imported,
+Jupyter Notebook,Development,Interactive notebook environment for data science and ML,,imported,
+VS Code,IDE,Lightweight code editor with rich extension ecosystem,,imported,
+Postman,API Testing,"Design, test, and document REST APIs interactively",,imported,
+Jira,Project Management,"Track issues, sprints, and project progress for dev teams",,imported,
+Confluence,Documentation,Team wiki and knowledge base for collaborative documentation,,imported,
+Notion,Productivity,"All-in-one workspace for notes, wikis, and project tracking",,imported,
+Figma,Design,Collaborative interface design and prototyping in the browser,,imported,
+Tableau,Data Visualisation,Interactive business intelligence and analytics dashboards,,imported,
+Power BI,Data Visualisation,Microsoft business analytics and reporting platform,,imported,
+Streamlit,ML Apps,Build interactive ML and data apps quickly in Python,,imported,
+Gradio,ML Apps,Create web UIs for ML models with minimal code,,imported,
+Ray,Distributed Computing,Scale Python ML and data workloads across clusters,,imported,
+ONNX Runtime,Model Serving,Cross-platform inference engine for optimised ML models,,imported,
+Triton Inference Server,Model Serving,High-throughput GPU model serving by NVIDIA,,imported,
+Vault,Secrets Management,"Securely store and manage secrets, tokens, and certificates",,imported,
+Snyk,Security,Find and fix vulnerabilities in code and dependencies,,imported,
+Semgrep,Static Analysis,Scan source code for bugs and security issues automatically,,imported,
+Datadog,Observability,"Full-stack monitoring, APM, and security in one platform",,imported,

@@ -23,6 +23,17 @@ class EmployeeStatus(models.Model):
     status = models.CharField(max_length=20, default="available")
     current_project = models.CharField(max_length=255, blank=True, null=True)
     workload_percent = models.IntegerField(default=0)
+    source = models.CharField(max_length=20, default="imported")
+    is_outreach = models.BooleanField(default=False)
+    outreach_project = models.ForeignKey(
+        TaskBoardProject,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="outreach_members",
+    )
+    rate_per_day = models.FloatField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -1,3 +1,6 @@
+import { useMemo, useState } from 'react';
+import MissionAnalysis from './MissionAnalysis';
+
 const PriorityBadge = ({ priority }) => {
   const level = priority || 'Low';
   const tone = level === 'High' ? 'high' : level === 'Medium' ? 'medium' : 'low';
@@ -14,6 +17,8 @@ const Orchestrator = ({
   projects,
   teamSize,
   onTeamSizeChange,
+  deadlineDays,
+  onDeadlineDaysChange,
   plan,
   assignedTeam,
   teamConflicts,
@@ -26,10 +31,58 @@ const Orchestrator = ({
   sendingEmails,
   emailToast,
   error,
+  onRunCustomAnalyze,
+  onRunCustomPlan,
+  customMissionAnalysis,
+  onResetCustomMissionAnalysis,
 }) => {
+  const [missionMode, setMissionMode] = useState('preset');
+  const [newMissionTitle, setNewMissionTitle] = useState('');
+  const [newMissionDescription, setNewMissionDescription] = useState('');
+  const [projectQuery, setProjectQuery] = useState('');
+  const [showProjectOptions, setShowProjectOptions] = useState(false);
   const projectName = plan?.project_name || '-';
   const priority = plan?.priority || 'Medium';
-  const deadline = plan?.deadline_days || '-';
+  const deadline = Number(plan?.deadline_days || deadlineDays || 1);
+  const filteredProjects = useMemo(() => {
+    const needle = projectQuery.trim().toLowerCase();
+    if (!needle) {
+      return projects;
+    }
+    return projects.filter((project) => {
+      const haystack = [project.project_name, project.description, project.priority]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [projects, projectQuery]);
+
+  const handleSelectProject = (project) => {
+    setProjectQuery(project.project_name || '');
+    onDescriptionChange(project.description || '');
+    setShowProjectOptions(false);
+  };
+
+  const runMissionAnalysis = () => {
+    onRunCustomAnalyze({
+      mission_title: newMissionTitle,
+      mission_description: newMissionDescription,
+      team_size: teamSize,
+      deadline_days: deadlineDays,
+    });
+  };
+
+  const runMissionPlan = () => {
+    const saveToDataset = window.confirm('Save this custom mission to project presets for future use?');
+    onRunCustomPlan({
+      mission_title: newMissionTitle,
+      mission_description: newMissionDescription,
+      team_size: teamSize,
+      deadline_days: deadlineDays,
+      save_to_dataset: saveToDataset,
+      extracted: customMissionAnalysis,
+    });
+  };
 
   return (
     <div className="view-stack">
@@ -39,30 +92,107 @@ const Orchestrator = ({
             <p className="section-title">🎯 Mission Control</p>
             <p className="section-subtitle">Describe your mission or project.</p>
           </div>
-          <button type="button" className="primary-button" onClick={onRun} disabled={loading || !description.trim()}>
-            {loading ? 'Finding Team...' : '🚀 Find My Team'}
+          {missionMode === 'preset' ? (
+            <button type="button" className="primary-button" onClick={onRun} disabled={loading || !description.trim()}>
+              {loading ? 'Finding Team...' : '🚀 Find My Team'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={runMissionAnalysis}
+              disabled={loading || !newMissionTitle.trim() || !newMissionDescription.trim()}
+            >
+              {loading ? 'Analysing...' : 'Analyse and Build Plan'}
+            </button>
+          )}
+        </div>
+
+        <div className="chip-row dense">
+          <button
+            type="button"
+            className={missionMode === 'preset' ? 'preset-chip active-chip' : 'preset-chip'}
+            onClick={() => setMissionMode('preset')}
+          >
+            Project Presets
+          </button>
+          <button
+            type="button"
+            className={missionMode === 'custom' ? 'preset-chip active-chip' : 'preset-chip'}
+            onClick={() => setMissionMode('custom')}
+          >
+            Add New Mission
           </button>
         </div>
 
-        <textarea
-          className="description-input large"
-          placeholder="Describe your mission or project..."
-          value={description}
-          onChange={(event) => onDescriptionChange(event.target.value)}
-        />
+        {missionMode === 'preset' ? (
+          <>
+            <textarea
+              className="description-input large"
+              placeholder="Describe your mission or project..."
+              value={description}
+              onChange={(event) => onDescriptionChange(event.target.value)}
+            />
 
-        <div className="chip-row">
-          {projects.slice(0, 8).map((project) => (
-            <button
-              key={project.project_id || project.project_name}
-              type="button"
-              className="preset-chip"
-              onClick={() => onDescriptionChange(project.description)}
-            >
-              {project.project_name}
-            </button>
-          ))}
-        </div>
+            <div className="team-size-selector">
+              <span className="dataset-meta">Project Presets</span>
+              <div className="project-dropdown-wrap">
+                <input
+                  className="search-input project-dropdown-input"
+                  placeholder="Search all projects by name, priority, or description"
+                  value={projectQuery}
+                  onFocus={() => setShowProjectOptions(true)}
+                  onChange={(event) => {
+                    setProjectQuery(event.target.value);
+                    setShowProjectOptions(true);
+                  }}
+                />
+
+                {showProjectOptions ? (
+                  <div className="project-dropdown-list" role="listbox">
+                    {filteredProjects.length ? (
+                      filteredProjects.map((project) => (
+                        <button
+                          key={project.project_id || project.project_name}
+                          type="button"
+                          className="project-dropdown-item"
+                          onClick={() => handleSelectProject(project)}
+                        >
+                          <span className="project-dropdown-name">{project.project_name}</span>
+                          <PriorityBadge priority={project.priority || 'Medium'} />
+                        </button>
+                      ))
+                    ) : (
+                      <p className="empty-state">No projects match your search.</p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <input
+              className="search-input"
+              placeholder="Mission Title"
+              value={newMissionTitle}
+              onChange={(event) => setNewMissionTitle(event.target.value)}
+            />
+            <textarea
+              className="description-input large"
+              placeholder="Describe goal, tech stack, constraints, and requirements in detail..."
+              value={newMissionDescription}
+              onChange={(event) => setNewMissionDescription(event.target.value)}
+            />
+
+            <MissionAnalysis
+              analysis={customMissionAnalysis}
+              onAdjust={onResetCustomMissionAnalysis}
+              onProceed={runMissionPlan}
+              busy={loading}
+            />
+          </>
+        )}
 
         <div className="team-size-selector">
           <span className="dataset-meta">Team Size</span>
@@ -77,6 +207,20 @@ const Orchestrator = ({
                 {size}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="team-size-selector">
+          <span className="dataset-meta">Deadline (days)</span>
+          <div className="form-grid" style={{ gridTemplateColumns: '180px' }}>
+            <input
+              className="search-input"
+              type="number"
+              min="1"
+              max="365"
+              value={deadlineDays}
+              onChange={(event) => onDeadlineDaysChange(Number(event.target.value || 1))}
+            />
           </div>
         </div>
       </div>
@@ -94,7 +238,7 @@ const Orchestrator = ({
         </div>
         <div className="stat-card">
           <span className="stat-label">Team Size</span>
-          <strong className="stat-value">{assignedTeam.length || 0}</strong>
+          <strong className="stat-value">{teamSize}</strong>
         </div>
         <div className="stat-card">
           <span className="stat-label">Deadline</span>

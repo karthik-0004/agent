@@ -62,7 +62,8 @@ const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete, on
                 {bucket.team.map((member) => (
                   <div key={`${bucket.id}-${member.name}`} className="bucket-line">
                     <span>
-                      {member.name}
+                      {member.is_outreach ? `🌐 ${member.name}` : member.name}
+                      {member.is_outreach ? <span className="dataset-meta outreach-inline">(Outreach)</span> : null}
                       <button
                         type="button"
                         className="mini-icon-button"
