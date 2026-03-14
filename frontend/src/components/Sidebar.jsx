@@ -1,4 +1,10 @@
-const Sidebar = ({ activeView, onSelect }) => {
+const PriorityPill = ({ priority }) => {
+  const tone = priority === 'High' ? 'high' : priority === 'Medium' ? 'medium' : 'low';
+  const label = priority === 'High' ? '🔴 High' : priority === 'Medium' ? '🟡 Medium' : '🟢 Low';
+  return <span className={`priority-pill ${tone}`}>{label}</span>;
+};
+
+const Sidebar = ({ activeView, onSelect, activeAssignments }) => {
   const sections = [
     {
       title: 'Agent',
@@ -18,6 +24,9 @@ const Sidebar = ({ activeView, onSelect }) => {
       ],
     },
   ];
+
+  const assigned = activeAssignments?.currently_assigned || [];
+  const available = activeAssignments?.available || [];
 
   return (
     <aside className="sidebar">
@@ -42,6 +51,42 @@ const Sidebar = ({ activeView, onSelect }) => {
           </div>
         </div>
       ))}
+
+      <div className="sidebar-section assignment-panel">
+        <p className="sidebar-section-title">Active Assignments</p>
+        <div className="assignment-list">
+          {assigned.length ? (
+            assigned.slice(0, 8).map((row) => (
+              <div key={`${row.employee_name}-${row.task_name}`} className="assignment-item">
+                <div>
+                  <p className="assignment-name">{row.employee_name}</p>
+                  <p className="assignment-task">{row.task_name}</p>
+                </div>
+                <div className="assignment-meta">
+                  <PriorityPill priority={row.priority || 'Low'} />
+                  <span className="assignment-deadline">{row.estimated_deadline_days}d</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="assignment-empty">No active assignments</p>
+          )}
+        </div>
+
+        <p className="sidebar-section-title">Available</p>
+        <div className="assignment-list compact">
+          {available.length ? (
+            available.slice(0, 8).map((row) => (
+              <div key={row.employee_name} className="assignment-item small">
+                <span className="assignment-name">{row.employee_name}</span>
+                <span className="assignment-deadline">{row.current_workload_percent}%</span>
+              </div>
+            ))
+          ) : (
+            <p className="assignment-empty">No available employees</p>
+          )}
+        </div>
+      </div>
     </aside>
   );
 };

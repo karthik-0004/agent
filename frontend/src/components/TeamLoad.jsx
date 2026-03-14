@@ -8,6 +8,17 @@ const getLoadTone = (value) => {
   return 'safe';
 };
 
+const computeRating = (employee) => {
+  const skills = String(employee.skills || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const workload = Number(employee.current_workload_percent || 0);
+  const capacity = Math.max(0, 100 - workload);
+  const score = Math.round((skills.length * 1.2) + (capacity * 0.08));
+  return Math.max(1, Math.min(10, score));
+};
+
 const TeamLoad = ({ employees, workloadUpdate, assignmentCounts }) => {
   if (!employees.length) {
     return <div className="card empty-state">No employee data available.</div>;
@@ -19,6 +30,8 @@ const TeamLoad = ({ employees, workloadUpdate, assignmentCounts }) => {
         const updatedLoad = workloadUpdate?.[employee.name] ?? employee.current_workload_percent;
         const tone = getLoadTone(updatedLoad);
         const assignedCount = assignmentCounts?.[employee.name] || 0;
+        const rating = computeRating(employee);
+        const riskFlag = Boolean(employee.deadline_risk);
 
         return (
           <div key={employee.employee_id} className="card employee-card">
@@ -27,7 +40,10 @@ const TeamLoad = ({ employees, workloadUpdate, assignmentCounts }) => {
                 <p className="employee-name">{employee.name}</p>
                 <p className="employee-role">{employee.role}</p>
               </div>
-              <span className={`load-badge ${tone}`}>{updatedLoad}%</span>
+              <div className="team-load-badges">
+                <span className="rating-badge">{rating}★</span>
+                <span className={`load-badge ${tone}`}>{updatedLoad}%</span>
+              </div>
             </div>
             <div className="chip-row dense">
               {String(employee.skills)
@@ -45,7 +61,10 @@ const TeamLoad = ({ employees, workloadUpdate, assignmentCounts }) => {
             </div>
             <div className="employee-footer">
               <span>Current workload</span>
-              <span>{assignedCount ? `+${assignedCount} tasks assigned` : 'No new tasks assigned'}</span>
+              <span>
+                {assignedCount ? `+${assignedCount} tasks assigned` : 'No new tasks assigned'}
+                {riskFlag ? '  ⚠ deadline risk' : ''}
+              </span>
             </div>
           </div>
         );

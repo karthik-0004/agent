@@ -20,6 +20,7 @@ class AgentRunView(APIView):
         history = datasets["history"]
 
         agent_service = AgentService()
+        risk_flags = agent_service.identify_deadline_risk_flags(history)
         plan = agent_service.decompose_tasks(
             serializer.validated_data["project_description"],
             employees,
@@ -27,14 +28,25 @@ class AgentRunView(APIView):
             history,
         )
         analysis = agent_service.analyze_project(serializer.validated_data["project_description"])
-        employee_matches = agent_service.match_employees(analysis["required_skills"], employees)
+        employee_matches = agent_service.match_employees(
+            analysis["required_skills"],
+            employees,
+            analysis["priority"],
+            risk_flags,
+        )
         employee_workload_update, assignment_counts = agent_service.calculate_workload_update(plan, employees)
+        active_assignments = agent_service.build_active_assignment_snapshot(
+            employees,
+            plan.get("tasks", []),
+            int(plan.get("deadline_days", analysis["deadline_days"])),
+        )
 
         payload = {
             **plan,
             "employee_matches": employee_matches,
             "employee_workload_update": employee_workload_update,
             "assignment_counts": assignment_counts,
+            "active_assignments": active_assignments,
         }
         return Response(payload, status=status.HTTP_200_OK)
 
@@ -57,14 +69,26 @@ class AgentReplanView(APIView):
             datasets["history"],
         )
         analysis = agent_service.analyze_project(serializer.validated_data["remaining_description"])
-        employee_matches = agent_service.match_employees(analysis["required_skills"], adjusted_employees)
+        risk_flags = agent_service.identify_deadline_risk_flags(datasets["history"])
+        employee_matches = agent_service.match_employees(
+            analysis["required_skills"],
+            adjusted_employees,
+            analysis["priority"],
+            risk_flags,
+        )
         employee_workload_update, assignment_counts = agent_service.calculate_workload_update(plan, adjusted_employees)
+        active_assignments = agent_service.build_active_assignment_snapshot(
+            adjusted_employees,
+            plan.get("tasks", []),
+            int(plan.get("deadline_days", analysis["deadline_days"])),
+        )
 
         payload = {
             **plan,
             "employee_matches": employee_matches,
             "employee_workload_update": employee_workload_update,
             "assignment_counts": assignment_counts,
+            "active_assignments": active_assignments,
         }
         return Response(payload, status=status.HTTP_200_OK)
 

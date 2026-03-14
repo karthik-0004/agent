@@ -51,6 +51,9 @@ pnpm-debug.log*
 .env.*
 backend/.env
 frontend/.env
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 
 # -----------------------------
 # Editor / OS files
@@ -70,3 +73,6 @@ Thumbs.db
 *.temp
 # Workspace-only documents
 Neurax_WorkflowAI_README.docx
+
+# Local dataset drop folder (canonical files live in backend/data)
+datasets/

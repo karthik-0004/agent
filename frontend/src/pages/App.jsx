@@ -11,6 +11,8 @@ import Orchestrator from '../components/Orchestrator';
 import Sidebar from '../components/Sidebar';
 import TaskBoard from '../components/TaskBoard';
 import TeamLoad from '../components/TeamLoad';
+import IntroScreen from '../components/IntroScreen';
+import EmployeeDirectory from '../components/EmployeeDirectory';
 
 const pipelineMessages = [
   'Analyzing request language, priority, and deadline.',
@@ -34,6 +36,8 @@ const DatasetSection = ({ title, subtitle, items, renderItem }) => (
 );
 
 const App = () => {
+  const [showIntro, setShowIntro] = useState(true);
+  const [workspaceVisible, setWorkspaceVisible] = useState(false);
   const [activeView, setActiveView] = useState('orchestrator');
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -46,6 +50,7 @@ const App = () => {
   const [thinkingLog, setThinkingLog] = useState([]);
   const [error, setError] = useState('');
   const [completedTasks, setCompletedTasks] = useState([]);
+  const [activeAssignments, setActiveAssignments] = useState({ currently_assigned: [], available: [] });
   const pipelineTimer = useRef(null);
 
   useEffect(() => {
@@ -64,20 +69,47 @@ const App = () => {
         if (projectData[0]?.description) {
           setProjectDescription(projectData[0].description);
         }
+        setActiveAssignments({
+          currently_assigned: [],
+          available: employeeData.map((employee) => ({
+            employee_name: employee.name,
+            role: employee.role,
+            current_workload_percent: employee.current_workload_percent,
+          })),
+        });
       } catch (requestError) {
         setError(requestError.message);
       }
     };
 
     fetchDatasets();
+    const timer = window.setTimeout(() => setWorkspaceVisible(true), 120);
 
     return () => {
       window.clearInterval(pipelineTimer.current);
+      window.clearTimeout(timer);
     };
   }, []);
 
   const workloadUpdate = plan?.employee_workload_update || {};
   const assignmentCounts = plan?.assignment_counts || {};
+  const employeeMatchMap = useMemo(() => {
+    const map = new Map();
+    (plan?.employee_matches || []).forEach((row) => map.set(row.name, row));
+    return map;
+  }, [plan]);
+  const enrichedEmployees = useMemo(
+    () =>
+      employees.map((employee) => {
+        const match = employeeMatchMap.get(employee.name);
+        return {
+          ...employee,
+          performance_rating: match?.performance_rating,
+          deadline_risk: Boolean(match?.deadline_risk),
+        };
+      }),
+    [employees, employeeMatchMap]
+  );
   const completedTaskNames = useMemo(() => completedTasks.map((task) => task.name), [completedTasks]);
 
   const startPipeline = (prefix) => {
@@ -118,10 +150,12 @@ const App = () => {
     try {
       const response = await runAgent(projectDescription);
       setPlan(response);
+      setActiveAssignments(response.active_assignments || { currently_assigned: [], available: [] });
       stopPipeline([
         `Run: priority resolved as ${response.priority}.`,
         `Run: generated ${response.tasks.length} tasks for ${response.project_name}.`,
         `Run: ${response.reasoning}`,
+        ...(response.alerts || []).map((message) => `Run alert: ${message}`),
       ]);
       setActiveView('orchestrator');
     } catch (requestError) {
@@ -159,10 +193,12 @@ const App = () => {
     try {
       const response = await replanAgent(updatedCompletedTasks, remainingDescription);
       setPlan(response);
+      setActiveAssignments(response.active_assignments || { currently_assigned: [], available: [] });
       stopPipeline([
         `Replan: completed task ${task.name} recorded.`,
         `Replan: replanned ${response.tasks.length} remaining tasks.`,
         `Replan: ${response.reasoning}`,
+        ...(response.alerts || []).map((message) => `Replan alert: ${message}`),
       ]);
       setActiveView('task-board');
     } catch (requestError) {
@@ -208,7 +244,7 @@ const App = () => {
               </div>
             </div>
             <TeamLoad
-              employees={employees}
+              employees={enrichedEmployees}
               workloadUpdate={workloadUpdate}
               assignmentCounts={assignmentCounts}
             />
@@ -252,30 +288,7 @@ const App = () => {
           />
         );
       case 'employees':
-        return (
-          <DatasetSection
-            title="Employees"
-            subtitle="Full employee dataset from the backend"
-            items={employees}
-            renderItem={(item) => (
-              <div key={item.employee_id} className="card dataset-card">
-                <p className="section-title small">{item.name}</p>
-                <p className="section-subtitle">{item.role}</p>
-                <p className="dataset-meta">Location: {item.location}</p>
-                <p className="dataset-meta">Workload: {item.current_workload_percent}%</p>
-                <div className="chip-row dense">
-                  {String(item.skills)
-                    .split(',')
-                    .map((skill) => skill.trim())
-                    .filter(Boolean)
-                    .map((skill) => (
-                      <span key={skill} className="chip neutral">{skill}</span>
-                    ))}
-                </div>
-              </div>
-            )}
-          />
-        );
+        return <EmployeeDirectory employees={enrichedEmployees} />;
       case 'projects':
         return (
           <DatasetSection
@@ -335,23 +348,28 @@ const App = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar activeView={activeView} onSelect={setActiveView} />
-      <main className="main-panel">
-        <div className="topbar">
-          <div>
-            <p className="eyebrow">Operational Workspace</p>
-            <h2 className="page-title">{activeView.replace('-', ' ')}</h2>
-          </div>
-          <div className="topbar-meta">
-            <span>{employees.length} employees</span>
-            <span>{projects.length} projects</span>
-            <span>{tools.length} tools</span>
-          </div>
+    <>
+      {showIntro ? <IntroScreen onEnter={() => setShowIntro(false)} /> : null}
+      <div className={workspaceVisible && !showIntro ? 'workspace-transition visible' : 'workspace-transition'}>
+        <div className="app-shell">
+          <Sidebar activeView={activeView} onSelect={setActiveView} activeAssignments={activeAssignments} />
+          <main className="main-panel">
+            <div className="topbar">
+              <div>
+                <p className="eyebrow">Operational Workspace</p>
+                <h2 className="page-title">{activeView.replace('-', ' ')}</h2>
+              </div>
+              <div className="topbar-meta">
+                <span>{employees.length} employees</span>
+                <span>{projects.length} projects</span>
+                <span>{tools.length} tools</span>
+              </div>
+            </div>
+            {renderContent()}
+          </main>
         </div>
-        {renderContent()}
-      </main>
-    </div>
+      </div>
+    </>
   );
 };
 
