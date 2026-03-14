@@ -350,6 +350,11 @@ button {
   background: var(--surface-muted);
 }
 
+.description-input.large {
+  min-height: 180px;
+  font-size: 16px;
+}
+
 .primary-button,
 .secondary-button {
   border-radius: 14px;
@@ -364,6 +369,11 @@ button {
 
 .secondary-button {
   background: var(--surface);
+}
+
+.secondary-button.danger {
+  border-color: #fecaca;
+  color: #b91c1c;
 }
 
 .primary-button:disabled,
@@ -422,6 +432,16 @@ button {
 .status-pill.idle {
   background: #eef2f6;
   color: #344054;
+}
+
+.status-pill.available {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill.assigned {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .priority-pill {
@@ -570,6 +590,82 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.assigned-team-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.suggested-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.suggested-team-row {
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  background: #fbfcfd;
+}
+
+.suggested-team-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.toast-success,
+.toast-fail {
+  margin-top: 12px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.toast-success {
+  border: 0.5px solid #86efac;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.toast-fail {
+  border: 0.5px solid #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.assigned-team-card {
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #fbfcfd;
+}
+
+.avatar-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #0f172a;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-size-selector {
+  margin-top: 16px;
+}
+
 .task-preview-card,
 .task-card,
 .dataset-card,
@@ -644,6 +740,122 @@ button {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.search-input {
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  min-width: 220px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bucket-card {
+  border-radius: 16px;
+}
+
+.bucket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bucket-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.bucket-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.bucket-line {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.bucket-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bucket-progress-track {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.bucket-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e, #84cc16);
+}
+
+.team-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.assignment-list.wide {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.expandable-header {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.expandable-content {
+  margin-top: 14px;
+  border-top: 0.5px solid var(--border);
+  padding-top: 12px;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-top: 8px;
+}
+
+.status-dot.green {
+  background: #22c55e;
+}
+
+.status-dot.red {
+  background: #ef4444;
 }
 
 .pagination-controls {
@@ -726,6 +938,15 @@ button {
   .employee-directory-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .assigned-team-grid,
+  .team-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bucket-line {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
@@ -753,9 +974,14 @@ button {
   .topbar,
   .section-header,
   .task-card-header,
-  .employee-footer {
+  .employee-footer,
+  .bucket-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -767,6 +993,11 @@ button {
   .team-grid,
   .stats-row,
   .employee-directory-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assigned-team-grid,
+  .team-overview-grid {
     grid-template-columns: 1fr;
   }
 

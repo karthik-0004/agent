@@ -26,10 +26,20 @@ const request = async (runner) => {
   }
 };
 
-export const runAgent = (description) =>
-  request(() => api.post('/agent/run/', { project_description: description }));
+export const runAgent = (description, teamSize, reshuffleToken = 0) =>
+  request(() =>
+    api.post('/agent/run/', {
+      project_description: description,
+      team_size: teamSize,
+      reshuffle_token: reshuffleToken,
+    })
+  );
 
 export const getEmployees = () => request(() => api.get('/employees/'));
+export const createEmployee = (employee) => request(() => api.post('/employees/', employee));
+export const updateEmployee = (employeeId, employee) =>
+  request(() => api.put(`/employees/${employeeId}/`, employee));
+export const deleteEmployee = (employeeId) => request(() => api.delete(`/employees/${employeeId}/`));
 export const getProjects = () => request(() => api.get('/projects/'));
 export const getTools = () => request(() => api.get('/tools/'));
 export const getHistory = () => request(() => api.get('/history/'));
@@ -41,5 +51,8 @@ export const replanAgent = (completedTasks, remainingDesc) =>
       remaining_description: remainingDesc,
     })
   );
+
+export const sendAssignments = (payload) =>
+  request(() => api.post('/agent/send-assignments/', payload));
 
 export default api;

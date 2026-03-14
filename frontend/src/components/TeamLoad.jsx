@@ -1,74 +1,55 @@
-const getLoadTone = (value) => {
-  if (value >= 75) {
-    return 'danger';
-  }
-  if (value >= 50) {
-    return 'warning';
-  }
-  return 'safe';
-};
-
-const computeRating = (employee) => {
-  const skills = String(employee.skills || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-  const workload = Number(employee.current_workload_percent || 0);
-  const capacity = Math.max(0, 100 - workload);
-  const score = Math.round((skills.length * 1.2) + (capacity * 0.08));
-  return Math.max(1, Math.min(10, score));
-};
-
-const TeamLoad = ({ employees, workloadUpdate, assignmentCounts }) => {
-  if (!employees.length) {
-    return <div className="card empty-state">No employee data available.</div>;
-  }
+const TeamLoad = ({ activeAssignments }) => {
+  const assigned = activeAssignments?.currently_assigned || [];
+  const available = activeAssignments?.available || [];
 
   return (
-    <div className="team-grid">
-      {employees.map((employee) => {
-        const updatedLoad = workloadUpdate?.[employee.name] ?? employee.current_workload_percent;
-        const tone = getLoadTone(updatedLoad);
-        const assignedCount = assignmentCounts?.[employee.name] || 0;
-        const rating = computeRating(employee);
-        const riskFlag = Boolean(employee.deadline_risk);
+    <div className="view-stack">
+      <div className="section-header">
+        <div>
+          <p className="section-title">Team Overview</p>
+          <p className="section-subtitle">Live working area for assigned and available teammates.</p>
+        </div>
+      </div>
 
-        return (
-          <div key={employee.employee_id} className="card employee-card">
-            <div className="section-header compact">
-              <div>
-                <p className="employee-name">{employee.name}</p>
-                <p className="employee-role">{employee.role}</p>
-              </div>
-              <div className="team-load-badges">
-                <span className="rating-badge">{rating}★</span>
-                <span className={`load-badge ${tone}`}>{updatedLoad}%</span>
-              </div>
-            </div>
-            <div className="chip-row dense">
-              {String(employee.skills)
-                .split(',')
-                .map((skill) => skill.trim())
-                .filter(Boolean)
-                .map((skill) => (
-                  <span key={skill} className="chip neutral">
-                    {skill}
-                  </span>
-                ))}
-            </div>
-            <div className="progress-track">
-              <div className={`progress-fill ${tone}`} style={{ width: `${updatedLoad}%` }} />
-            </div>
-            <div className="employee-footer">
-              <span>Current workload</span>
-              <span>
-                {assignedCount ? `+${assignedCount} tasks assigned` : 'No new tasks assigned'}
-                {riskFlag ? '  ⚠ deadline risk' : ''}
-              </span>
-            </div>
+      <div className="team-overview-grid">
+        <div className="card">
+          <p className="section-title small">🔴 Currently Assigned</p>
+          <div className="assignment-list wide">
+            {assigned.length ? (
+              assigned.map((row) => (
+                <div key={`${row.employee_name}-${row.task_name}`} className="assignment-item">
+                  <div>
+                    <p className="assignment-name">{row.employee_name}</p>
+                    <p className="assignment-task">{row.task_name}</p>
+                  </div>
+                  <span className="assignment-deadline">{row.estimated_deadline_days}d</span>
+                </div>
+              ))
+            ) : (
+              <p className="assignment-empty">No one assigned right now.</p>
+            )}
           </div>
-        );
-      })}
+        </div>
+
+        <div className="card">
+          <p className="section-title small">🟢 Available</p>
+          <div className="assignment-list wide">
+            {available.length ? (
+              available.map((row) => (
+                <div key={row.employee_name} className="assignment-item">
+                  <div>
+                    <p className="assignment-name">{row.employee_name}</p>
+                    <p className="assignment-task">{row.role}</p>
+                  </div>
+                  <span className="assignment-deadline">{row.current_workload_percent}%</span>
+                </div>
+              ))
+            ) : (
+              <p className="assignment-empty">No available teammates.</p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

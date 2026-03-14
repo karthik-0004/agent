@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -17,32 +18,174 @@ DATA_FILE_CANDIDATES = {
 }
 
 _DATA_CACHE: dict[str, list[dict[str, Any]]] = {}
+_DATA_SOURCE_PATHS: dict[str, Path] = {}
 _CACHE_LOCK = Lock()
+
+KARTHIK_PROFILE = {
+    "employee_id": "EMP-001",
+    "name": "G. Karthikeyan",
+    "email": "karthikgangaji@gmail.com",
+    "role": "Full Stack Developer",
+    "skills": "python, react, django, api design, sql, system design, node.js, aws",
+    "current_workload_percent": 38,
+    "location": "Chennai, India",
+    "availability_status": "Available",
+    "rating": 9,
+}
+
+
+def _normalize_key(key: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9]+", "_", str(key).strip().lower())
+    return re.sub(r"_+", "_", normalized).strip("_")
 
 
 def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     for key, value in record.items():
+        canonical_key = _normalize_key(str(key))
         if pd.isna(value):
-            normalized[key] = None
+            normalized[canonical_key] = None
         elif isinstance(value, str):
-            normalized[key] = value.strip()
+            normalized[canonical_key] = value.strip()
         elif isinstance(value, float) and value.is_integer():
-            normalized[key] = int(value)
+            normalized[canonical_key] = int(value)
         else:
-            normalized[key] = value
+            normalized[canonical_key] = value
     return normalized
 
 
-def _resolve_dataset_file(dataset_name: str) -> Path:
-    for data_dir in DATA_DIRECTORIES:
-        for candidate in DATA_FILE_CANDIDATES[dataset_name]:
-            candidate_path = data_dir / candidate
-            if candidate_path.exists():
-                return candidate_path
-    raise FileNotFoundError(
-        f"No dataset file found for '{dataset_name}'. Expected one of: {', '.join(DATA_FILE_CANDIDATES[dataset_name])}"
-    )
+def _string(value: Any, fallback: str = "") -> str:
+    if value is None:
+        return fallback
+    return str(value).strip()
+
+
+def _int(value: Any, fallback: int = 0) -> int:
+    try:
+        return int(float(value))
+    except Exception:
+        return fallback
+
+
+def _slug_email_part(value: str) -> str:
+    lowered = value.strip().lower()
+    lowered = re.sub(r"[^a-z0-9]+", ".", lowered)
+    lowered = re.sub(r"\.+", ".", lowered).strip(".")
+    return lowered or "employee"
+
+
+def _email_from_name(name: str) -> str:
+    name = name.strip()
+    if not name:
+        return "employee@neurax.io"
+    parts = [part for part in re.split(r"\s+", name.replace(".", " ")) if part]
+    if len(parts) == 1:
+        return f"{_slug_email_part(parts[0])}@neurax.io"
+    return f"{_slug_email_part(parts[0])}.{_slug_email_part(parts[-1])}@neurax.io"
+
+
+def _canonicalize_employee(record: dict[str, Any]) -> dict[str, Any]:
+    employee_name = _string(record.get("name") or record.get("employee_name"))
+    email_value = _string(record.get("email") or record.get("email_address"))
+    if not email_value:
+        if employee_name.lower() == "g. karthikeyan":
+            email_value = KARTHIK_PROFILE["email"]
+        else:
+            email_value = _email_from_name(employee_name)
+
+    rating_value = _int(record.get("rating") or record.get("performance_score") or 0)
+    if rating_value <= 0:
+        rating_value = 7
+
+    return {
+        **record,
+        "employee_id": _string(record.get("employee_id") or record.get("id") or record.get("emp_id")),
+        "name": employee_name,
+        "email": email_value,
+        "role": _string(record.get("role") or record.get("job_title")),
+        "location": _string(record.get("location") or record.get("office") or "N/A"),
+        "skills": _string(record.get("skills") or record.get("skill_set") or ""),
+        "current_workload_percent": _int(record.get("current_workload_percent") or record.get("workload_percent") or 0),
+        "availability_status": _string(record.get("availability_status") or "Available"),
+        "rating": max(1, min(10, rating_value)),
+    }
+
+
+def _canonicalize_project(record: dict[str, Any]) -> dict[str, Any]:
+    priority_value = _string(record.get("priority") or "Medium")
+    if priority_value.lower() == "critical":
+        priority_value = "High"
+
+    return {
+        **record,
+        "project_id": _string(record.get("project_id") or record.get("id")),
+        "project_name": _string(record.get("project_name") or record.get("name") or "Unnamed Project"),
+        "description": _string(record.get("description") or ""),
+        "required_skills": _string(record.get("required_skills") or record.get("skills") or ""),
+        "deadline_days": _int(record.get("deadline_days") or 14),
+        "priority": priority_value.capitalize() if priority_value else "Medium",
+        "status": _string(record.get("status") or "Open"),
+    }
+
+
+def _canonicalize_tool(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **record,
+        "tool_id": _string(record.get("tool_id") or record.get("id")),
+        "name": _string(record.get("name") or record.get("tool_name") or "Unnamed Tool"),
+        "category": _string(record.get("category") or record.get("tool_type") or "General"),
+        "purpose_keywords": _string(record.get("purpose_keywords") or record.get("purpose") or ""),
+        "supported_skills": _string(record.get("supported_skills") or record.get("supported_languages") or ""),
+    }
+
+
+def _canonicalize_history(record: dict[str, Any]) -> dict[str, Any]:
+    outcome = _string(record.get("outcomes") or record.get("outcome") or "Unknown")
+    outcome_badge = "Successful"
+    if any(term in outcome.lower() for term in ["partial", "mixed"]):
+        outcome_badge = "Partial"
+    if any(term in outcome.lower() for term in ["failed", "fail", "unsuccessful"]):
+        outcome_badge = "Failed"
+
+    return {
+        **record,
+        "history_id": _string(record.get("history_id") or record.get("id")),
+        "project_id": _string(record.get("project_id") or ""),
+        "project_name": _string(record.get("project_name") or "Past Project"),
+        "summary": _string(record.get("lessons_learned") or record.get("summary") or ""),
+        "team_members": _string(record.get("team_members") or ""),
+        "tools_used": _string(record.get("tools_used") or ""),
+        "outcome": outcome_badge,
+        "on_time": bool(record.get("on_time", False)),
+        "planned_days": _int(record.get("planned_days") or 0),
+        "duration_days": _int(record.get("duration_days") or 0),
+    }
+
+
+def _canonicalize_dataset(dataset_name: str, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if dataset_name == "employees":
+        return [_canonicalize_employee(record) for record in records if _canonicalize_employee(record).get("name")]
+    if dataset_name == "projects":
+        return [_canonicalize_project(record) for record in records if _canonicalize_project(record).get("project_name")]
+    if dataset_name == "tools":
+        return [_canonicalize_tool(record) for record in records if _canonicalize_tool(record).get("name")]
+    if dataset_name == "history":
+        return [_canonicalize_history(record) for record in records if _canonicalize_history(record).get("project_name")]
+    return records
+
+
+def _ensure_karthik_record(employees: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    non_karthik = [employee for employee in employees if _string(employee.get("name")).lower() != "g. karthikeyan"]
+    karthik = _canonicalize_employee(KARTHIK_PROFILE)
+    ordered = [karthik, *non_karthik]
+    for index, employee in enumerate(ordered, start=1):
+        if employee.get("name") == "G. Karthikeyan":
+            employee["employee_id"] = "EMP-001"
+            continue
+        employee_id = _string(employee.get("employee_id"))
+        if not employee_id or employee_id == "EMP-001":
+            employee["employee_id"] = f"EMP-{index:03d}"
+    return ordered
 
 
 def _load_dataset(file_path: Path) -> list[dict[str, Any]]:
@@ -64,7 +207,9 @@ def _load_first_available_dataset(dataset_name: str) -> list[dict[str, Any]]:
             if not candidate_path.exists():
                 continue
             try:
-                return _load_dataset(candidate_path)
+                loaded = _load_dataset(candidate_path)
+                _DATA_SOURCE_PATHS[dataset_name] = candidate_path
+                return _canonicalize_dataset(dataset_name, loaded)
             except Exception as error:
                 errors.append(f"{candidate_path.name}: {error}")
                 continue
@@ -85,6 +230,7 @@ def preload_data() -> dict[str, list[dict[str, Any]]]:
             return _DATA_CACHE
         for dataset_name in DATA_FILE_CANDIDATES:
             _DATA_CACHE[dataset_name] = _load_first_available_dataset(dataset_name)
+        _DATA_CACHE["employees"] = _ensure_karthik_record(_DATA_CACHE.get("employees", []))
         return _DATA_CACHE
 
 
@@ -106,3 +252,69 @@ def get_tools() -> list[dict[str, Any]]:
 
 def get_history() -> list[dict[str, Any]]:
     return get_datasets()["history"]
+
+
+def _employees_output_path() -> Path:
+    source = _DATA_SOURCE_PATHS.get("employees")
+    if source and source.exists():
+        return source
+    return BACKEND_DATA_DIR / "neurax_employees_v2.csv"
+
+
+def _persist_employees() -> None:
+    output_path = _employees_output_path()
+    dataframe = pd.DataFrame(get_employees())
+    if output_path.suffix.lower() in {".xlsx", ".xls"}:
+        dataframe.to_excel(output_path, index=False)
+    else:
+        dataframe.to_csv(output_path, index=False)
+
+
+def _next_employee_id() -> str:
+    employees = get_employees()
+    max_index = 0
+    for employee in employees:
+        match = re.search(r"(\d+)$", _string(employee.get("employee_id"), ""))
+        if match:
+            max_index = max(max_index, int(match.group(1)))
+    return f"EMP{max_index + 1:03d}"
+
+
+def add_employee(payload: dict[str, Any]) -> dict[str, Any]:
+    employees = get_employees()
+    new_record = _canonicalize_employee(payload)
+    if not new_record.get("employee_id"):
+        new_record["employee_id"] = _next_employee_id()
+    if not new_record.get("availability_status"):
+        new_record["availability_status"] = "Available"
+    employees.append(new_record)
+    employees[:] = _ensure_karthik_record(employees)
+    _persist_employees()
+    return new_record
+
+
+def update_employee(employee_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+    employees = get_employees()
+    for index, employee in enumerate(employees):
+        if _string(employee.get("employee_id")) != employee_id:
+            continue
+        merged = dict(employee)
+        merged.update(payload)
+        canonical = _canonicalize_employee(merged)
+        canonical["employee_id"] = employee_id
+        employees[index] = canonical
+        employees[:] = _ensure_karthik_record(employees)
+        _persist_employees()
+        return canonical
+    return None
+
+
+def delete_employee(employee_id: str) -> bool:
+    employees = get_employees()
+    original_count = len(employees)
+    employees[:] = [employee for employee in employees if _string(employee.get("employee_id")) != employee_id]
+    if len(employees) == original_count:
+        return False
+    employees[:] = _ensure_karthik_record(employees)
+    _persist_employees()
+    return True

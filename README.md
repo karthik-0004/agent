@@ -1,27 +1,34 @@
-# Neurax Autonomous Workflow AI Agent
+# Neurax Taskifier
 
-Neurax is a React + Django REST autonomous planning platform with smart staffing, tool recommendations, and replanning.
+Manager-first autonomous workflow platform built with React + Django REST.
 
-## Core upgrades
+## What this version focuses on
 
-- OpenAI migration (`gpt-4o`) with backend `.env` key loading (`OPENAI_API_KEY`).
-- Fallback deterministic planner remains active when no key is set.
-- v2 dataset support for Excel files:
-	- `neurax_employees_v2.xlsx`
-	- `neurax_projects_v2.xlsx`
-	- `neurax_tools_v2.xlsx`
-	- `neurax_project_history_v2.xlsx`
-- Animated SaaS intro screen with logo reveal, typewriter tagline, and workspace transition.
-- Active Assignments live sidebar section (currently assigned + available workforce).
-- Employee directory pagination for 100+ rows with deterministic performance rating (`1-10`).
-- Smart assignment logic with:
-	- skill match scoring
-	- capacity weighting
-	- performance weighting
-	- deadline risk flags
-	- reassignment alerts for deadline pressure
-- Task priorities (`High`, `Medium`, `Low`) with filter support in Task Board.
-- Tool recommendation cards per task (top 3 with match reason).
+- The Karthik Rule: G. Karthikeyan is always pinned as team slot #1.
+- Team size behavior:
+	- 1: only Karthik
+	- 2-5: Karthik + reshuffled best-match members
+- Reshuffle never replaces Karthik.
+- Confirmed team can trigger assignment emails from Mission Control.
+- Mission Control input first: manager writes the mission and selects team size (1-5).
+- Clean plan summary in under 5 seconds: project, priority, team size, deadline.
+- Assigned Team card with role and availability status.
+- Employee management with full CRUD:
+	- add new employee
+	- edit employee
+	- delete employee with confirmation
+- Employee directory built for large datasets:
+	- search by name/role/skill
+	- pagination (12 per page)
+	- deterministic rating (1-10)
+	- status pill (assigned/available)
+- Task Board redesigned to project buckets with team progress bars.
+- Past Projects and Projects as expandable cards with compact-to-detailed interaction.
+- Tools section fixed to map dataset fields correctly:
+	- `tool_name` -> `name`
+	- `purpose` -> `purpose_keywords`
+	- `supported_languages` -> `supported_skills`
+	- paginated catalog for all tools.
 
 ## Folder notes
 
@@ -74,17 +81,44 @@ Open: `http://localhost:3000`
 
 - `POST /api/agent/run/`
 - `POST /api/agent/replan/`
+- `POST /api/agent/send-assignments/`
 - `GET /api/employees/`
+- `POST /api/employees/`
+- `PUT /api/employees/<employee_id>/`
+- `DELETE /api/employees/<employee_id>/`
 - `GET /api/projects/`
 - `GET /api/tools/`
 - `GET /api/history/`
 
 ## Data loading behavior
 
-- The backend tries v2 Excel files first, then falls back to legacy CSV datasets.
-- Datasets are preloaded at startup and embedded into the LLM planning context.
+- Loader checks v2 datasets first (`.xlsx`, then `.csv`) and falls back to legacy CSV files.
+- Supported input roots:
+	- `backend/data`
+	- `datasets`
+- Canonical field mapping is applied server-side so frontend cards always receive stable keys.
 
 ## Security note
 
 - Keep API keys server-side only (`backend/.env`).
 - Do not place OpenAI keys in frontend environment variables.
+
+## SMTP setup for assignment emails
+
+Set these in `backend/.env`:
+
+```env
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=237r1a3327@cmrtc.ac.in
+EMAIL_HOST_PASSWORD=your-gmail-app-password
+EMAIL_USE_TLS=True
+EMAIL_FROM_NAME=Neurax Taskifier
+```
+
+Gmail requires a 16-character App Password (not your normal account password):
+
+1. Google Account -> Security
+2. Enable 2-Step Verification
+3. Open App Passwords
+4. Generate an app password for Mail

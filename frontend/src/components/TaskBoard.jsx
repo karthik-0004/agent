@@ -7,27 +7,25 @@ const PriorityBadge = ({ priority }) => {
   return <span className={`priority-pill ${tone}`}>{label}</span>;
 };
 
-const TaskBoard = ({ plan, completedTaskNames, onMarkComplete, loading }) => {
-  const [priorityFilter, setPriorityFilter] = useState('All');
-  const tasks = plan?.tasks || [];
+const progressFromWorkload = (workload) => {
+  const value = Math.max(10, Math.min(95, 100 - Number(workload || 0)));
+  return value;
+};
 
-  const visibleTasks = useMemo(() => {
+const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete }) => {
+  const visibleBuckets = useMemo(() => {
     if (priorityFilter === 'All') {
-      return tasks;
+      return buckets;
     }
-    return tasks.filter((task) => (task.priority || 'Low') === priorityFilter);
-  }, [tasks, priorityFilter]);
-
-  if (!plan) {
-    return <div className="card empty-state">Run the agent to generate a task board.</div>;
-  }
+    return buckets.filter((bucket) => bucket.priority === priorityFilter);
+  }, [buckets, priorityFilter]);
 
   return (
     <div className="view-stack">
       <div className="section-header">
         <div>
           <p className="section-title">Task Board</p>
-          <p className="section-subtitle">Mark tasks complete to trigger autonomous replanning.</p>
+          <p className="section-subtitle">Projects grouped as clear delivery buckets.</p>
         </div>
         <div className="chip-row">
           {['All', 'High', 'Medium', 'Low'].map((item) => (
@@ -35,67 +33,51 @@ const TaskBoard = ({ plan, completedTaskNames, onMarkComplete, loading }) => {
               key={item}
               type="button"
               className={priorityFilter === item ? 'preset-chip active-chip' : 'preset-chip'}
-              onClick={() => setPriorityFilter(item)}
+              onClick={() => onFilterChange(item)}
             >
               {item}
             </button>
           ))}
         </div>
       </div>
-      <div className="task-board-grid">
-        {visibleTasks.map((task) => {
-          const isCompleted = completedTaskNames.includes(task.name);
-          return (
-            <div key={task.name} className="card task-card">
-              <div className="task-card-header">
+
+      <div className="view-stack">
+        {visibleBuckets.length ? (
+          visibleBuckets.map((bucket) => (
+            <div key={bucket.id} className="card bucket-card hover-lift">
+              <div className="bucket-header">
                 <div>
-                  <strong>{task.name}</strong>
-                  <p className="task-description">{task.description}</p>
+                  <p className="bucket-title">🟢 Project: {bucket.project_name}</p>
+                  <p className="dataset-meta">Deadline: {bucket.deadline_days} days</p>
                 </div>
-                <div className="task-card-status">
-                  <PriorityBadge priority={task.priority} />
-                  <span className="chip amber">{task.duration} days</span>
-                </div>
+                <PriorityBadge priority={bucket.priority} />
               </div>
-              <div className="task-meta-block">
-                <div className="chip-row dense">
-                  {(task.assignees || []).map((assignee) => (
-                    <span key={assignee} className="chip blue">
-                      {assignee}
-                    </span>
-                  ))}
-                </div>
-                <div className="chip-row dense">
-                  {(task.tools || []).map((tool) => (
-                    <span key={tool} className="chip green">
-                      {tool}
-                    </span>
-                  ))}
-                </div>
-                <div className="tool-recommendation-card">
-                  <p className="tool-rec-title">Top 3 Tool Recommendations</p>
-                  {(task.tool_recommendations || []).slice(0, 3).map((recommendation) => (
-                    <div key={`${task.name}-${recommendation.name}`} className="tool-rec-item">
-                      <div>
-                        <strong>{recommendation.name}</strong>
-                        <p className="dataset-meta">{recommendation.category}</p>
+
+              <div className="bucket-lines">
+                {bucket.team.map((member) => (
+                  <div key={`${bucket.id}-${member.name}`} className="bucket-line">
+                    <span>{member.name}</span>
+                    <div className="bucket-progress-wrap">
+                      <div className="bucket-progress-track">
+                        <div
+                          className="bucket-progress-fill"
+                          style={{ width: `${progressFromWorkload(member.current_workload_percent)}%` }}
+                        />
                       </div>
-                      <p className="dataset-meta">{recommendation.reason}</p>
+                      <span>{progressFromWorkload(member.current_workload_percent)}%</span>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => onMarkComplete(task)}
-                disabled={loading || isCompleted}
-              >
-                {isCompleted ? 'Completed' : loading ? 'Replanning...' : 'Mark Complete'}
+
+              <button type="button" className="secondary-button" onClick={() => onMarkComplete(bucket.id)}>
+                Mark Complete
               </button>
             </div>
-          );
-        })}
+          ))
+        ) : (
+          <div className="card empty-state">No projects in this priority bucket.</div>
+        )}
       </div>
     </div>
   );

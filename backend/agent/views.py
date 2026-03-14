@@ -4,9 +4,10 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import AgentReplanSerializer, AgentRunSerializer
+from .serializers import AgentReplanSerializer, AgentRunSerializer, EmployeeSerializer, SendAssignmentsSerializer
 from .services.agent_service import AgentService
-from .services.data_loader import get_datasets
+from .services.data_loader import add_employee, delete_employee, get_datasets, update_employee
+from .services.email_service import send_assignment_emails
 
 
 class AgentRunView(APIView):
@@ -26,6 +27,8 @@ class AgentRunView(APIView):
             employees,
             tools,
             history,
+            serializer.validated_data.get("team_size", 3),
+            serializer.validated_data.get("reshuffle_token", 0),
         )
         analysis = agent_service.analyze_project(serializer.validated_data["project_description"])
         employee_matches = agent_service.match_employees(
@@ -67,6 +70,7 @@ class AgentReplanView(APIView):
             adjusted_employees,
             datasets["tools"],
             datasets["history"],
+            3,
         )
         analysis = agent_service.analyze_project(serializer.validated_data["remaining_description"])
         risk_flags = agent_service.identify_deadline_risk_flags(datasets["history"])
@@ -104,6 +108,28 @@ class DatasetView(APIView):
 class EmployeesView(DatasetView):
     dataset_key = "employees"
 
+    def post(self, request):
+        serializer = EmployeeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        created = add_employee(serializer.validated_data)
+        return Response(created, status=status.HTTP_201_CREATED)
+
+
+class EmployeeDetailView(APIView):
+    def put(self, request, employee_id: str):
+        serializer = EmployeeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        updated = update_employee(employee_id, serializer.validated_data)
+        if not updated:
+            return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(updated, status=status.HTTP_200_OK)
+
+    def delete(self, request, employee_id: str):
+        deleted = delete_employee(employee_id)
+        if not deleted:
+            return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"status": "deleted"}, status=status.HTTP_200_OK)
+
 
 class ProjectsView(DatasetView):
     dataset_key = "projects"
@@ -115,3 +141,11 @@ class ToolsView(DatasetView):
 
 class HistoryView(DatasetView):
     dataset_key = "history"
+
+
+class SendAssignmentsView(APIView):
+    def post(self, request):
+        serializer = SendAssignmentsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = send_assignment_emails(serializer.validated_data)
+        return Response(result, status=status.HTTP_200_OK)

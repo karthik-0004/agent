@@ -80,3 +80,15 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
     ],
 }
+
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Neurax Taskifier")
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "30"))
+EMAIL_ALLOW_INSECURE_TLS = os.getenv("EMAIL_ALLOW_INSECURE_TLS", "False").lower() == "true"
+DEFAULT_FROM_EMAIL = (
+    f"{EMAIL_FROM_NAME} <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else EMAIL_FROM_NAME
+)

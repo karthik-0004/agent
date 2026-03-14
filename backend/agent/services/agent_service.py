@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import importlib
 import os
+import random
 import re
 from collections import defaultdict
 from typing import Any
@@ -10,6 +11,7 @@ from typing import Any
 
 class AgentService:
     MODEL_NAME = "gpt-4o"
+    KARTHIK_NAME = "G. Karthikeyan"
 
     def __init__(self) -> None:
         self.api_key = os.getenv("OPENAI_API_KEY", "")
@@ -25,7 +27,7 @@ class AgentService:
     def _split_keywords(value: str | None) -> list[str]:
         if not value:
             return []
-        return [item.strip().lower() for item in re.split(r"[,/|]", str(value)) if item.strip()]
+        return [item.strip().lower() for item in re.split(r"[;,/|]", str(value)) if item.strip()]
 
     def analyze_project(self, project_description: str) -> dict[str, Any]:
         priority_match = re.search(r"\b(high|medium|low)\b", project_description, re.IGNORECASE)
@@ -47,6 +49,13 @@ class AgentService:
         }
 
     def calculate_performance_rating(self, employee: dict[str, Any]) -> int:
+        explicit_rating = employee.get("rating")
+        try:
+            if explicit_rating is not None:
+                return max(1, min(10, int(float(explicit_rating))))
+        except Exception:
+            pass
+
         skills = self._split_keywords(employee.get("skills"))
         workload = float(employee.get("current_workload_percent", 0) or 0)
         capacity = max(0.0, 100.0 - workload)
@@ -106,6 +115,7 @@ class AgentService:
         required_skill_set = {skill.lower() for skill in required_skills}
         risk_flags = risk_flags or set()
 
+        karthik_row: dict[str, Any] | None = None
         for employee in employees:
             score, matched, capacity, rating, is_risky = self.score_employee(
                 employee,
@@ -113,19 +123,46 @@ class AgentService:
                 project_priority,
                 risk_flags,
             )
-            ranked.append(
-                {
-                    "name": employee.get("name"),
-                    "role": employee.get("role"),
-                    "matched_skills": matched,
-                    "available_capacity": round(capacity, 2),
-                    "performance_rating": rating,
-                    "deadline_risk": is_risky,
-                    "score": round(score, 2),
-                }
-            )
+            row = {
+                "name": employee.get("name"),
+                "role": employee.get("role"),
+                "email": employee.get("email"),
+                "matched_skills": matched,
+                "available_capacity": round(capacity, 2),
+                "performance_rating": rating,
+                "deadline_risk": is_risky,
+                "score": round(score, 2),
+            }
+            if str(employee.get("name")) == self.KARTHIK_NAME:
+                karthik_row = row
+                continue
+            ranked.append(row)
 
-        return sorted(ranked, key=lambda item: item["score"], reverse=True)
+        ranked = sorted(ranked, key=lambda item: item["score"], reverse=True)
+
+        # Karthik is always pinned to slot 0 before the rest of ranking is considered.
+        if karthik_row:
+            return [karthik_row, *ranked]
+
+        return ranked
+
+    def _sample_best_matches(
+        self,
+        ranked: list[dict[str, Any]],
+        count: int,
+        reshuffle_token: int,
+    ) -> list[dict[str, Any]]:
+        if count <= 0:
+            return []
+
+        if len(ranked) <= count:
+            return ranked
+
+        candidate_pool = ranked[: max(count + 3, min(18, len(ranked)))]
+        rng = random.Random(reshuffle_token)
+        sampled = rng.sample(candidate_pool, k=count)
+        sampled_sorted = sorted(sampled, key=lambda item: item.get("score", 0), reverse=True)
+        return sampled_sorted
 
     def select_tools(self, required_skills: list[str], tools: list[dict[str, Any]]) -> list[str]:
         selected: list[tuple[int, str]] = []
@@ -248,11 +285,13 @@ class AgentService:
         required_skills: list[str],
         employees: list[dict[str, Any]],
         history: list[dict[str, Any]],
+        eligible_team: list[str] | None = None,
     ) -> tuple[list[dict[str, Any]], list[str]]:
         alerts: list[str] = []
         risk_flags = self.identify_deadline_risk_flags(history)
         ranked = self.match_employees(required_skills, employees, plan.get("priority", "Medium"), risk_flags)
         rank_lookup = {str(item["name"]): item for item in ranked}
+        eligible_set = set(eligible_team or [])
 
         adjusted_tasks: list[dict[str, Any]] = []
         per_task_budget = max(1, int(plan.get("deadline_days", 14) / max(1, len(plan.get("tasks", [])))))
@@ -263,8 +302,16 @@ class AgentService:
             task_copy["priority"] = task_priority
             assignees = list(task_copy.get("assignees", []))
 
+            if eligible_set:
+                assignees = [name for name in assignees if name in eligible_set]
+
             if not assignees and ranked:
-                assignees = [ranked[0]["name"]]
+                for candidate in ranked:
+                    candidate_name = candidate["name"]
+                    if eligible_set and candidate_name not in eligible_set:
+                        continue
+                    assignees = [candidate_name]
+                    break
 
             if task_priority == "High":
                 assignees = [
@@ -273,7 +320,14 @@ class AgentService:
                     if not rank_lookup.get(str(name), {}).get("deadline_risk")
                 ]
                 if not assignees:
-                    fallback = next((row["name"] for row in ranked if not row.get("deadline_risk")), None)
+                    fallback = next(
+                        (
+                            row["name"]
+                            for row in ranked
+                            if not row.get("deadline_risk") and (not eligible_set or row["name"] in eligible_set)
+                        ),
+                        None,
+                    )
                     if fallback:
                         assignees = [fallback]
                         alerts.append(
@@ -281,7 +335,11 @@ class AgentService:
                         )
 
             if int(task_copy.get("duration", 1)) > per_task_budget:
-                candidates = [row for row in ranked if row["name"] not in assignees]
+                candidates = [
+                    row
+                    for row in ranked
+                    if row["name"] not in assignees and (not eligible_set or row["name"] in eligible_set)
+                ]
                 if candidates:
                     replacement = candidates[0]["name"]
                     dropped = assignees[0] if assignees else "unassigned"
@@ -295,12 +353,74 @@ class AgentService:
 
         return adjusted_tasks, alerts
 
+    def select_assigned_team(
+        self,
+        required_skills: list[str],
+        employees: list[dict[str, Any]],
+        history: list[dict[str, Any]],
+        project_priority: str,
+        team_size: int,
+        reshuffle_token: int = 0,
+    ) -> list[dict[str, Any]]:
+        risk_flags = self.identify_deadline_risk_flags(history)
+        ranked = self.match_employees(required_skills, employees, project_priority, risk_flags)
+
+        karthik = next((row for row in ranked if row.get("name") == self.KARTHIK_NAME), None)
+        others = [row for row in ranked if row.get("name") != self.KARTHIK_NAME]
+        remaining_slots = max(0, team_size - 1)
+
+        chosen = []
+        if karthik:
+            chosen.append(karthik)
+
+        if team_size == 1:
+            chosen = chosen[:1]
+        else:
+            chosen.extend(self._sample_best_matches(others, remaining_slots, reshuffle_token))
+
+        chosen = chosen[:team_size]
+
+        employee_map = {str(employee.get("name")): employee for employee in employees}
+        payload = []
+        for row in chosen:
+            employee = employee_map.get(str(row.get("name")), {})
+            payload.append(
+                {
+                    "name": row.get("name"),
+                    "email": row.get("email") or employee.get("email"),
+                    "role": row.get("role") or employee.get("role"),
+                    "availability_status": employee.get("availability_status", "Available"),
+                    "current_workload_percent": employee.get("current_workload_percent", 0),
+                    "performance_rating": row.get("performance_rating", self.calculate_performance_rating(employee)),
+                }
+            )
+
+        if payload and payload[0].get("name") != self.KARTHIK_NAME:
+            karthik_employee = employee_map.get(self.KARTHIK_NAME)
+            if karthik_employee:
+                payload.insert(
+                    0,
+                    {
+                        "name": self.KARTHIK_NAME,
+                        "email": karthik_employee.get("email"),
+                        "role": karthik_employee.get("role"),
+                        "availability_status": karthik_employee.get("availability_status", "Available"),
+                        "current_workload_percent": karthik_employee.get("current_workload_percent", 0),
+                        "performance_rating": int(karthik_employee.get("rating", 9)),
+                    },
+                )
+                payload = payload[:team_size]
+
+        return payload
+
     def decompose_tasks(
         self,
         project_description: str,
         employees: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         history: list[dict[str, Any]],
+        team_size: int = 3,
+        reshuffle_token: int = 0,
     ) -> dict[str, Any]:
         project_meta = self.analyze_project(project_description)
         system_prompt = (
@@ -321,9 +441,24 @@ class AgentService:
 
         if not self.client:
             base_plan = self._fallback_plan(project_description, project_meta, employees, tools, history)
-            tasks, alerts = self.enforce_assignment_rules(base_plan, project_meta["required_skills"], employees, history)
+            assigned_team = self.select_assigned_team(
+                project_meta["required_skills"],
+                employees,
+                history,
+                project_meta["priority"],
+                team_size,
+                reshuffle_token,
+            )
+            tasks, alerts = self.enforce_assignment_rules(
+                base_plan,
+                project_meta["required_skills"],
+                employees,
+                history,
+                [member["name"] for member in assigned_team],
+            )
             base_plan["tasks"] = tasks
             base_plan["alerts"] = alerts
+            base_plan["assigned_team"] = assigned_team
             return base_plan
 
         try:
@@ -340,9 +475,24 @@ class AgentService:
             plan = self._extract_json(content)
         except Exception:
             base_plan = self._fallback_plan(project_description, project_meta, employees, tools, history)
-            tasks, alerts = self.enforce_assignment_rules(base_plan, project_meta["required_skills"], employees, history)
+            assigned_team = self.select_assigned_team(
+                project_meta["required_skills"],
+                employees,
+                history,
+                project_meta["priority"],
+                team_size,
+                reshuffle_token,
+            )
+            tasks, alerts = self.enforce_assignment_rules(
+                base_plan,
+                project_meta["required_skills"],
+                employees,
+                history,
+                [member["name"] for member in assigned_team],
+            )
             base_plan["tasks"] = tasks
             base_plan["alerts"] = alerts
+            base_plan["assigned_team"] = assigned_team
             return base_plan
 
         plan["priority"] = plan.get("priority", project_meta["priority"])
@@ -363,13 +513,23 @@ class AgentService:
             }
             for task in plan.get("tasks", [])
         ]
+        assigned_team = self.select_assigned_team(
+            project_meta["required_skills"],
+            employees,
+            history,
+            plan.get("priority", project_meta["priority"]),
+            team_size,
+            reshuffle_token,
+        )
         plan["tasks"], plan_alerts = self.enforce_assignment_rules(
             plan,
             project_meta["required_skills"],
             employees,
             history,
+            [member["name"] for member in assigned_team],
         )
         plan["alerts"] = plan_alerts
+        plan["assigned_team"] = assigned_team
         return plan
 
     def calculate_workload_update(
