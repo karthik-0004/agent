@@ -1,8 +1,10 @@
 from django.urls import path
 
 from .views import (
+    ActivitiesView,
     AgentReplanView,
     AgentRunView,
+    AnalyticsView,
     EmployeeDetailView,
     EmployeesAddView,
     EmployeesView,
@@ -31,6 +33,8 @@ urlpatterns = [
     path("taskboard/<int:project_id>/add-member/", TaskBoardAddMemberView.as_view(), name="taskboard-add-member"),
     path("taskboard/<int:project_id>/remove-member/", TaskBoardRemoveMemberView.as_view(), name="taskboard-remove-member"),
     path("taskboard/<int:project_id>/complete/", TaskBoardCompleteView.as_view(), name="taskboard-complete"),
+    path("analytics/", AnalyticsView.as_view(), name="analytics"),
+    path("activities/", ActivitiesView.as_view(), name="activities"),
     path("projects/", ProjectsView.as_view(), name="projects"),
     path("tools/", ToolsView.as_view(), name="tools"),
     path("history/", HistoryView.as_view(), name="history"),

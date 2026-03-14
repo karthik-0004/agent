@@ -27,3 +27,14 @@ class EmployeeStatus(models.Model):
 
     class Meta:
         ordering = ["name"]
+
+
+class ActivityLog(models.Model):
+    activity_type = models.CharField(max_length=64)
+    title = models.CharField(max_length=255)
+    detail = models.CharField(max_length=255, blank=True, default="")
+    meta = models.JSONField(blank=True, default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

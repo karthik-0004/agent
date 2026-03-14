@@ -5,6 +5,8 @@ import {
   completeTaskBoardProject,
   createTaskBoardProject,
   deleteEmployee,
+  getActivities,
+  getAnalytics,
   getEmployeeStatuses,
   getEmployees,
   getHistory,
@@ -16,6 +18,7 @@ import {
   sendAssignments,
   updateEmployee,
 } from '../api/agentApi';
+import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import EmployeeDirectory from '../components/EmployeeDirectory';
 import Orchestrator from '../components/Orchestrator';
 import Sidebar from '../components/Sidebar';
@@ -158,7 +161,7 @@ const ExpandableProjectCard = ({ project, badge, dotTone, children }) => {
 };
 
 const App = () => {
-  const [activeView, setActiveView] = useState('mission-control');
+  const [activeView, setActiveView] = useState('analytics');
   const [employees, setEmployees] = useState([]);
   const [employeeStatuses, setEmployeeStatuses] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -185,6 +188,11 @@ const App = () => {
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedAddMember, setSelectedAddMember] = useState(null);
   const [taskBoardNotice, setTaskBoardNotice] = useState(null);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsActivities, setAnalyticsActivities] = useState([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('7d');
+  const [leaderboardSort, setLeaderboardSort] = useState('rating');
 
   const loadCoreData = async () => {
     const [employeeData, statusData, projectData, historyData, toolData, taskboardData] = await Promise.all([
@@ -206,8 +214,22 @@ const App = () => {
     }
   };
 
+  const loadAnalyticsData = async (period = analyticsPeriod) => {
+    setAnalyticsLoading(true);
+    try {
+      const [data, acts] = await Promise.all([getAnalytics(period), getActivities()]);
+      setAnalyticsData(data);
+      setAnalyticsActivities(acts);
+    } catch {
+      // silently fail so dashboard shows empty state
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadCoreData().catch((requestError) => setError(requestError.message));
+    loadAnalyticsData();
   }, []);
 
   useEffect(() => {
@@ -269,6 +291,22 @@ const App = () => {
       })
       .slice(0, 30);
   }, [addMemberTarget, employees, memberSearch]);
+
+  const sortedLeaderboard = useMemo(() => {
+    const rows = analyticsData?.leaderboard || [];
+    return [...rows].sort((a, b) => {
+      if (leaderboardSort === 'projects') return b.projects - a.projects;
+      if (leaderboardSort === 'on_time') return b.on_time - a.on_time;
+      return b.rating - a.rating;
+    });
+  }, [analyticsData, leaderboardSort]);
+
+  const handlePeriodChange = (period) => {
+    setAnalyticsPeriod(period);
+    loadAnalyticsData(period);
+  };
+
+  const handleLeaderboardSort = (col) => setLeaderboardSort(col);
 
   const handleRunPlan = async (avoidConflicts = false, tokenOverride = null) => {
     setLoading(true);
@@ -494,6 +532,21 @@ const App = () => {
   };
 
   const renderContent = () => {
+    if (activeView === 'analytics') {
+      return (
+        <AnalyticsDashboard
+          data={{ ...analyticsData, leaderboard: sortedLeaderboard }}
+          activities={analyticsActivities}
+          loading={analyticsLoading}
+          period={analyticsPeriod}
+          onPeriodChange={handlePeriodChange}
+          leaderboardSort={leaderboardSort}
+          onLeaderboardSort={handleLeaderboardSort}
+          onViewFullTeam={() => setActiveView('team-overview')}
+        />
+      );
+    }
+
     if (activeView === 'mission-control') {
       return (
         <Orchestrator

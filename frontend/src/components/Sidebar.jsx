@@ -3,6 +3,7 @@ const Sidebar = ({ activeView, onSelect }) => {
     {
       title: 'Workspace',
       items: [
+        { id: 'analytics', label: '📊 Analytics' },
         { id: 'mission-control', label: 'Mission Control' },
         { id: 'task-board', label: 'Task Board' },
         { id: 'team-overview', label: 'Team Overview' },

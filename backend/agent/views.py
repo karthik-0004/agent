@@ -4,11 +4,12 @@ from datetime import datetime, timedelta
 import time
 
 from django.db import OperationalError, transaction
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import EmployeeStatus, TaskBoardProject
+from .models import ActivityLog, EmployeeStatus, TaskBoardProject
 from .serializers import (
     AgentReplanSerializer,
     AgentRunSerializer,
@@ -342,3 +343,185 @@ class EmployeeStatusView(APIView):
     def get(self, request):
         rows = _sync_employee_statuses_safe()
         return Response(rows, status=status.HTTP_200_OK)
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _log_activity(activity_type: str, title: str, detail: str = "", meta: dict | None = None) -> None:
+    try:
+        ActivityLog.objects.create(
+            activity_type=activity_type,
+            title=title,
+            detail=detail,
+            meta=meta or {},
+        )
+    except Exception:
+        pass
+
+
+def _human_time_ago(dt) -> str:
+    now = timezone.now()
+    delta = now - dt
+    seconds = int(delta.total_seconds())
+    if seconds < 60:
+        return f"{seconds}s ago"
+    if seconds < 3600:
+        return f"{seconds // 60}m ago"
+    if seconds < 86400:
+        return f"{seconds // 3600}h ago"
+    return f"{delta.days}d ago"
+
+
+def _build_analytics_payload(period: str = "7d") -> dict:
+    days = 30 if period == "30d" else 7
+    now = timezone.now()
+    since = now - timedelta(days=days)
+
+    all_projects = list(TaskBoardProject.objects.all())
+    ongoing = [p for p in all_projects if p.status == "ongoing"]
+    completed = [p for p in all_projects if p.status == "completed"]
+    overdue = [p for p in ongoing if p.deadline_days <= 0]
+
+    # top stats
+    top_stats = {
+        "total_projects": len(all_projects),
+        "ongoing_projects": len(ongoing),
+        "completed_projects": len(completed),
+        "overdue_projects": len(overdue),
+    }
+
+    # status distribution donut
+    status_distribution = [
+        {"name": "Ongoing", "value": len(ongoing)},
+        {"name": "Completed", "value": len(completed)},
+        {"name": "Overdue", "value": len(overdue)},
+    ]
+
+    # team utilisation bar (from EmployeeStatus)
+    statuses = list(EmployeeStatus.objects.all())
+    team_utilization = [
+        {"name": row.name.split()[0] if row.name else "Unknown", "workload_percent": row.workload_percent}
+        for row in statuses
+    ][:30]
+
+    # task completion trend (projects completed per day over period)
+    trend_map: dict[str, int] = {}
+    for i in range(days):
+        day = (now - timedelta(days=days - 1 - i)).strftime("%d %b")
+        trend_map[day] = 0
+    for project in completed:
+        day_str = project.updated_at.strftime("%d %b")
+        if day_str in trend_map:
+            trend_map[day_str] += 1
+    task_completion_trend = [{"date": d, "completed": v} for d, v in trend_map.items()]
+
+    # priority breakdown
+    priority_breakdown = [
+        {
+            "label": "High",
+            "high": sum(1 for p in all_projects if p.priority == "High"),
+            "medium": 0,
+            "low": 0,
+        },
+        {
+            "label": "Medium",
+            "high": 0,
+            "medium": sum(1 for p in all_projects if p.priority == "Medium"),
+            "low": 0,
+        },
+        {
+            "label": "Low",
+            "high": 0,
+            "medium": 0,
+            "low": sum(1 for p in all_projects if p.priority == "Low"),
+        },
+    ]
+
+    # secondary stats
+    datasets = get_datasets()
+    employees_list = datasets.get("employees", [])
+    tools_list = datasets.get("tools", [])
+    available_count = sum(1 for row in statuses if row.status == "available")
+    avg_rating = 0.0
+    if employees_list:
+        ratings = [float(e.get("performance_rating", 0) or 0) for e in employees_list]
+        avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0.0
+
+    secondary_stats = {
+        "total_employees": len(employees_list),
+        "available_now": available_count,
+        "avg_team_rating": avg_rating,
+        "tools_in_use": len(tools_list),
+    }
+
+    # leaderboard (from EmployeeStatus + employee dataset)
+    emp_map = {str(e.get("name", "")).strip(): e for e in employees_list}
+    leaderboard = []
+    for row in statuses:
+        emp = emp_map.get(row.name, {})
+        leaderboard.append({
+            "name": row.name,
+            "rating": float(emp.get("performance_rating", 0) or 0),
+            "projects": int(emp.get("completed_projects", 0) or 0),
+            "on_time": int(emp.get("on_time_delivery_rate", 0) or 0),
+            "status": row.status,
+        })
+    leaderboard.sort(key=lambda r: r["rating"], reverse=True)
+
+    # project health
+    project_health = []
+    for project in ongoing[:20]:
+        total_days = max(1, project.deadline_days)
+        elapsed = max(0, total_days - project.deadline_days)
+        progress = min(100, round(elapsed / total_days * 100))
+        if project.deadline_days <= 2:
+            health = "Critical"
+        elif project.deadline_days <= 5:
+            health = "At Risk"
+        else:
+            health = "On Track"
+        project_health.append({
+            "project_name": project.project_name,
+            "team": [m.get("name", "") for m in (project.team or [])],
+            "deadline_days": project.deadline_days,
+            "progress": progress,
+            "health": health,
+        })
+
+    return {
+        "top_stats": top_stats,
+        "charts": {
+            "status_distribution": status_distribution,
+            "team_utilization": team_utilization,
+            "task_completion_trend": task_completion_trend,
+            "priority_breakdown": priority_breakdown,
+        },
+        "secondary_stats": secondary_stats,
+        "leaderboard": leaderboard,
+        "project_health": project_health,
+    }
+
+
+# ── analytics views ───────────────────────────────────────────────────────────
+
+class AnalyticsView(APIView):
+    def get(self, request):
+        period = request.query_params.get("period", "7d")
+        payload = _build_analytics_payload(period)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class ActivitiesView(APIView):
+    def get(self, request):
+        logs = ActivityLog.objects.all()[:50]
+        data = [
+            {
+                "id": log.id,
+                "activity_type": log.activity_type,
+                "title": log.title,
+                "detail": log.detail,
+                "time_ago": _human_time_ago(log.created_at),
+            }
+            for log in logs
+        ]
+        return Response(data, status=status.HTTP_200_OK)

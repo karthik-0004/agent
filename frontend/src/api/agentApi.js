@@ -67,4 +67,7 @@ export const removeTaskBoardMember = (projectId, member) =>
 export const completeTaskBoardProject = (projectId) =>
   request(() => api.patch(`/taskboard/${projectId}/complete/`, {}));
 
+export const getAnalytics = (period = '7d') => request(() => api.get(`/analytics/?period=${period}`));
+export const getActivities = () => request(() => api.get('/activities/'));
+
 export default api;
