@@ -12,7 +12,7 @@ const progressFromWorkload = (workload) => {
   return value;
 };
 
-const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete, onAddMember, onRemoveMember }) => {
+const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete, onAddMember, onRemoveMember, notice }) => {
   const visibleBuckets = useMemo(() => {
     if (priorityFilter === 'All') {
       return buckets;
@@ -42,6 +42,11 @@ const TaskBoard = ({ buckets, priorityFilter, onFilterChange, onMarkComplete, on
       </div>
 
       <div className="view-stack">
+        {notice ? (
+          <div className={notice.type === 'success' ? 'toast-success' : 'toast-fail'}>
+            {notice.message}
+          </div>
+        ) : null}
         {visibleBuckets.length ? (
           visibleBuckets.map((bucket) => (
             <div key={bucket.id} className="card bucket-card hover-lift">

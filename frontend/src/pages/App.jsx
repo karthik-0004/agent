@@ -181,6 +181,10 @@ const App = () => {
   const [teamConfirmed, setTeamConfirmed] = useState(false);
   const [sendingEmails, setSendingEmails] = useState(false);
   const [emailToast, setEmailToast] = useState(null);
+  const [addMemberTarget, setAddMemberTarget] = useState(null);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [selectedAddMember, setSelectedAddMember] = useState(null);
+  const [taskBoardNotice, setTaskBoardNotice] = useState(null);
 
   const loadCoreData = async () => {
     const [employeeData, statusData, projectData, historyData, toolData, taskboardData] = await Promise.all([
@@ -247,6 +251,24 @@ const App = () => {
     () => taskBoardProjects.filter((project) => String(project.status).toLowerCase() === 'completed'),
     [taskBoardProjects]
   );
+
+  const addMemberOptions = useMemo(() => {
+    if (!addMemberTarget) {
+      return [];
+    }
+    const assignedNames = new Set((addMemberTarget.team || []).map((member) => member.name));
+    const query = memberSearch.trim().toLowerCase();
+    return employees
+      .filter((employee) => !assignedNames.has(employee.name))
+      .filter((employee) => {
+        if (!query) {
+          return true;
+        }
+        const haystack = [employee.name, employee.role, employee.email].join(' ').toLowerCase();
+        return haystack.includes(query);
+      })
+      .slice(0, 30);
+  }, [addMemberTarget, employees, memberSearch]);
 
   const handleRunPlan = async (avoidConflicts = false, tokenOverride = null) => {
     setLoading(true);
@@ -316,7 +338,6 @@ const App = () => {
       });
       setTeamConfirmed(true);
       await loadCoreData();
-      setActiveView('task-board');
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -369,29 +390,65 @@ const App = () => {
     }
   };
 
-  const handleAddMember = async (bucket) => {
-    const options = employees
-      .filter((employee) => !bucket.team.some((member) => member.name === employee.name))
-      .map((employee) => employee.name);
+  const handleAddMember = (bucket) => {
+    setAddMemberTarget(bucket);
+    setMemberSearch('');
+    setSelectedAddMember(null);
+    setTaskBoardNotice(null);
+  };
 
-    const pickedName = window.prompt(`Add member to ${bucket.project_name}. Enter exact name:\n${options.slice(0, 20).join(', ')}`);
-    if (!pickedName) {
+  const handleConfirmAddMember = async () => {
+    if (!addMemberTarget || !selectedAddMember) {
       return;
     }
 
-    const pickedEmployee = employees.find((employee) => employee.name.toLowerCase() === pickedName.toLowerCase());
-    if (!pickedEmployee) {
-      setError('Employee not found for add-member.');
-      return;
-    }
+    try {
+      await addTaskBoardMember(addMemberTarget.id, {
+        name: selectedAddMember.name,
+        email: selectedAddMember.email,
+        role: selectedAddMember.role,
+        current_workload_percent: selectedAddMember.current_workload_percent,
+      });
 
-    await addTaskBoardMember(bucket.id, {
-      name: pickedEmployee.name,
-      email: pickedEmployee.email,
-      role: pickedEmployee.role,
-      current_workload_percent: pickedEmployee.current_workload_percent,
-    });
-    await loadCoreData();
+      const sendResult = await sendAssignments({
+        project_name: addMemberTarget.project_name,
+        priority: addMemberTarget.priority,
+        deadline_days: addMemberTarget.deadline_days,
+        deadline_date: addMemberTarget.deadline_date,
+        tasks: (addMemberTarget.tasks || []).map((task) => ({
+          name: task.name,
+          description: task.description,
+          duration: task.duration,
+        })),
+        team: [
+          {
+            name: selectedAddMember.name,
+            email: selectedAddMember.email,
+            role: selectedAddMember.role,
+          },
+        ],
+      });
+
+      if (sendResult.failed > 0) {
+        const failed = (sendResult.results || [])[0];
+        setTaskBoardNotice({
+          type: 'error',
+          message: `Member added, but email failed for ${failed?.email || selectedAddMember.email}.`,
+        });
+      } else {
+        setTaskBoardNotice({
+          type: 'success',
+          message: `Added ${selectedAddMember.name} and emailed ${selectedAddMember.email}.`,
+        });
+      }
+
+      setAddMemberTarget(null);
+      setSelectedAddMember(null);
+      setMemberSearch('');
+      await loadCoreData();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
   const handleRemoveMember = async (bucket, member) => {
@@ -473,6 +530,7 @@ const App = () => {
           onMarkComplete={handleMarkBucketComplete}
           onAddMember={handleAddMember}
           onRemoveMember={handleRemoveMember}
+          notice={taskBoardNotice}
         />
       );
     }
@@ -594,6 +652,61 @@ const App = () => {
         </div>
         {error && activeView !== 'mission-control' ? <div className="error-box">{error}</div> : null}
         {renderContent()}
+
+        {addMemberTarget ? (
+          <div className="modal-backdrop" role="dialog" aria-modal="true">
+            <div className="modal-card">
+              <div className="section-header compact">
+                <div>
+                  <p className="section-title">Add Member</p>
+                  <p className="section-subtitle">{addMemberTarget.project_name}</p>
+                </div>
+              </div>
+
+              <input
+                className="search-input"
+                placeholder="Search by name, role, or email"
+                value={memberSearch}
+                onChange={(event) => setMemberSearch(event.target.value)}
+              />
+
+              <div className="modal-member-list">
+                {addMemberOptions.map((employee) => (
+                  <button
+                    key={employee.employee_id || employee.name}
+                    type="button"
+                    className={selectedAddMember?.name === employee.name ? 'modal-member-row active' : 'modal-member-row'}
+                    onClick={() => setSelectedAddMember(employee)}
+                  >
+                    <div>
+                      <p className="employee-name">{employee.name}</p>
+                      <p className="employee-role">{employee.role}</p>
+                    </div>
+                    <span className="dataset-meta">{employee.email}</span>
+                  </button>
+                ))}
+                {!addMemberOptions.length ? <p className="empty-state">No matching employee found.</p> : null}
+              </div>
+
+              <div className="card-actions">
+                <button type="button" className="primary-button" disabled={!selectedAddMember} onClick={handleConfirmAddMember}>
+                  Add + Send Email
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    setAddMemberTarget(null);
+                    setSelectedAddMember(null);
+                    setMemberSearch('');
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );

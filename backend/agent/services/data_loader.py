@@ -208,6 +208,27 @@ def _canonicalize_dataset(dataset_name: str, records: list[dict[str, Any]]) -> l
 
 def _ensure_special_records(employees: list[dict[str, Any]]) -> list[dict[str, Any]]:
     special_names = {_string(profile.get("name")).lower() for profile in SPECIAL_PROFILES}
+    by_name = {
+        _string(employee.get("name")).lower(): _canonicalize_employee(employee)
+        for employee in employees
+        if _string(employee.get("name"))
+    }
+
+    special_records = []
+    for profile in SPECIAL_PROFILES:
+        profile_name = _string(profile.get("name")).lower()
+        existing = by_name.get(profile_name)
+        if existing:
+            merged = dict(_canonicalize_employee(profile))
+            merged.update(existing)
+            # Keep canonical id and required pinned email for Akshaya.
+            merged["employee_id"] = profile["employee_id"]
+            if profile_name == "akshaya nuthalapati":
+                merged["email"] = "aksh.ayanuthalapati.0523@gmail.com"
+            special_records.append(merged)
+        else:
+            special_records.append(_canonicalize_employee(profile))
+
     non_special = []
     seen_names: set[str] = set()
     for employee in employees:
@@ -218,7 +239,7 @@ def _ensure_special_records(employees: list[dict[str, Any]]) -> list[dict[str, A
             continue
         seen_names.add(name)
         non_special.append(employee)
-    special_records = [_canonicalize_employee(profile) for profile in SPECIAL_PROFILES]
+
     ordered = [*special_records, *non_special]
     for index, employee in enumerate(ordered, start=1):
         if _string(employee.get("name")).lower() in special_names:

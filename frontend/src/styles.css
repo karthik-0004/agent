@@ -811,6 +811,53 @@ button {
   background: #fff7ed;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 60;
+}
+
+.modal-card {
+  width: min(760px, 96vw);
+  max-height: 86vh;
+  overflow: auto;
+  background: #ffffff;
+  border: 0.5px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.2);
+}
+
+.modal-member-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.modal-member-row {
+  width: 100%;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: #fbfcfd;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.modal-member-row.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
 .bucket-progress-wrap {
   display: flex;
   align-items: center;
