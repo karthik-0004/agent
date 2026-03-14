@@ -1,0 +1,4 @@
+project_id,project_name,description,priority,deadline_days,required_skills
+PRJ-101,Customer Support Triage AI,"Build a high priority AI assistant that triages customer support tickets, integrates with CRM, and ships in 21 days.",High,21,"python, django, workflow automation, analytics"
+PRJ-102,Executive Delivery Dashboard,"Create a medium priority executive dashboard for delivery status, team load, and risk visibility within 14 days.",Medium,14,"react, dashboarding, analytics, api design"
+PRJ-103,Developer Ops Copilot,"Design a low priority internal copilot for CI alerts, deployment guidance, and incident summaries in 30 days.",Low,30,"observability, aws, workflow automation, react"

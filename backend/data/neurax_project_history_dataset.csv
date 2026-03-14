@@ -1,0 +1,5 @@
+history_id,project_name,summary,key_skills,tools_used,outcome
+HIS-001,Sales Forecast Engine,"Delivered a forecasting workflow with automated weekly refreshes and alerting.","python, pandas, reporting","JupyterHub, Airflow, Looker",successful
+HIS-002,Ops Incident Console,"Built a central incident console with deployment context and alert routing.","react, observability, aws","Grafana, GitHub Actions, Figma",successful
+HIS-003,Document Intake Automation,"Automated document routing with OCR review and approval checkpoints.","workflow automation, qa, django","Zapier, Selenium Grid, Notion",successful
+HIS-004,Portfolio Health Dashboard,"Shipped a dashboard for portfolio status and staffing pressure monitoring.","dashboarding, analytics, api design","Looker, Postman, Figma",successful

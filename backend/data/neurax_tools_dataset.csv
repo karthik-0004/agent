@@ -1,0 +1,9 @@
+tool_id,name,category,purpose_keywords,supported_skills
+TOOL-001,Airflow,Orchestration,"workflow automation, scheduling, data pipelines","python, airflow, workflow automation"
+TOOL-002,Looker,Analytics,"dashboarding, reporting, metrics, analytics","analytics, dashboarding, reporting"
+TOOL-003,Postman,API,"api design, testing, integration","api design, django, integrations"
+TOOL-004,Figma,Design,"ux, wireframes, interface design","ux, dashboarding, react"
+TOOL-005,Grafana,Observability,"monitoring, observability, alerting","observability, aws, reporting"
+TOOL-006,GitHub Actions,Delivery,"ci/cd, deployment, automation","ci/cd, aws, workflow automation"
+TOOL-007,Selenium Grid,Quality,"qa, browser automation, testing","qa, selenium, workflow automation"
+TOOL-008,JupyterHub,Research,"analysis, notebooks, experimentation","python, pandas, analytics"

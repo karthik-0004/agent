@@ -1,0 +1,7 @@
+employee_id,name,role,skills,current_workload_percent,location
+EMP-001,Aisha Patel,AI Solutions Architect,"python, django, api design, mlops, system design",42,London
+EMP-002,Marcus Chen,Data Engineer,"python, pandas, airflow, sql, data pipelines",58,Singapore
+EMP-003,Elena Garcia,Frontend Engineer,"react, javascript, ux, dashboarding, data visualization",36,Madrid
+EMP-004,Noah Kim,DevOps Engineer,"docker, kubernetes, ci/cd, aws, observability",64,Seoul
+EMP-005,Sophia Johnson,Product Analyst,"requirements, roadmap, analytics, experimentation, reporting",27,New York
+EMP-006,Omar Hassan,Automation Specialist,"python, workflow automation, integrations, qa, selenium",49,Dubai
