@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import MissionAnalysis from './MissionAnalysis';
 
 const PriorityBadge = ({ priority }) => {
@@ -41,6 +41,7 @@ const Orchestrator = ({
   const [newMissionDescription, setNewMissionDescription] = useState('');
   const [projectQuery, setProjectQuery] = useState('');
   const [showProjectOptions, setShowProjectOptions] = useState(false);
+  const projectDropdownRef = useRef(null);
   const projectName = plan?.project_name || '-';
   const priority = plan?.priority || 'Medium';
   const deadline = Number(plan?.deadline_days || deadlineDays || 1);
@@ -59,7 +60,7 @@ const Orchestrator = ({
 
   const handleSelectProject = (project) => {
     setProjectQuery(project.project_name || '');
-    onDescriptionChange(project.description || '');
+    onDescriptionChange(project.description || project.project_name || '');
     setShowProjectOptions(false);
   };
 
@@ -84,22 +85,36 @@ const Orchestrator = ({
     });
   };
 
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!showProjectOptions) {
+        return;
+      }
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target)) {
+        setShowProjectOptions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showProjectOptions]);
+
   return (
     <div className="view-stack">
-      <div className="card">
+      <div className="card scroll-reveal">
         <div className="section-header">
           <div>
             <p className="section-title">🎯 Mission Control</p>
             <p className="section-subtitle">Describe your mission or project.</p>
           </div>
           {missionMode === 'preset' ? (
-            <button type="button" className="primary-button" onClick={onRun} disabled={loading || !description.trim()}>
+            <button type="button" className="primary-button primary-attention" onClick={onRun} disabled={loading || !description.trim()}>
               {loading ? 'Finding Team...' : '🚀 Find My Team'}
             </button>
           ) : (
             <button
               type="button"
-              className="primary-button"
+              className="primary-button primary-attention"
               onClick={runMissionAnalysis}
               disabled={loading || !newMissionTitle.trim() || !newMissionDescription.trim()}
             >
@@ -136,7 +151,7 @@ const Orchestrator = ({
 
             <div className="team-size-selector">
               <span className="dataset-meta">Project Presets</span>
-              <div className="project-dropdown-wrap">
+              <div className="project-dropdown-wrap" ref={projectDropdownRef}>
                 <input
                   className="search-input project-dropdown-input"
                   placeholder="Search all projects by name, priority, or description"
@@ -227,7 +242,7 @@ const Orchestrator = ({
 
       {error ? <div className="error-box">{error}</div> : null}
 
-      <div className="stats-row">
+      <div className="stats-row row-cascade">
         <div className="stat-card">
           <span className="stat-label">Project</span>
           <strong className="stat-value">{projectName}</strong>
@@ -246,7 +261,7 @@ const Orchestrator = ({
         </div>
       </div>
 
-      <div className="card">
+      <div className="card scroll-reveal">
         <div className="section-header compact">
           <div>
             <p className="section-title">👥 Suggested Team — {assignedTeam.length} Members</p>
@@ -294,7 +309,7 @@ const Orchestrator = ({
       </div>
 
       {teamConflicts.length && !conflictsResolved ? (
-        <div className="card warning-card">
+        <div className="card warning-card scroll-reveal">
           <p className="section-title">⚠️ Conflict Detected</p>
           <p className="section-subtitle">The following members are already assigned to active projects:</p>
           <div className="chip-row dense">
@@ -316,7 +331,7 @@ const Orchestrator = ({
       ) : null}
 
       {teamConfirmed ? (
-        <div className="card">
+        <div className="card scroll-reveal">
           <div className="section-header compact">
             <div>
               <p className="section-title">✅ Team Confirmed!</p>

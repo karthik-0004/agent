@@ -165,6 +165,16 @@ const ExpandableProjectCard = ({ project, badge, dotTone, children }) => {
 };
 
 const App = () => {
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') {
+      return 'light';
+    }
+    const saved = window.localStorage.getItem('neurax-theme');
+    if (saved === 'light' || saved === 'dark') {
+      return saved;
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
   const [activeView, setActiveView] = useState('analytics');
   const [employees, setEmployees] = useState([]);
   const [employeeStatuses, setEmployeeStatuses] = useState([]);
@@ -218,7 +228,7 @@ const App = () => {
     setTools(toolData);
     setTaskBoardProjects(taskboardData);
     if (!description) {
-      setDescription(projectData[0]?.description || '');
+      setDescription(projectData[0]?.description || projectData[0]?.project_name || '');
     }
   };
 
@@ -242,6 +252,14 @@ const App = () => {
   };
 
   useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+    window.localStorage.setItem('neurax-theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
     loadCoreData().catch((requestError) => setError(requestError.message));
     loadAnalyticsData();
   }, []);
@@ -254,6 +272,40 @@ const App = () => {
     window.addEventListener('neurax:bulk-sync-complete', handleBulkSync);
     return () => window.removeEventListener('neurax:bulk-sync-complete', handleBulkSync);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      return;
+    }
+
+    const targets = document.querySelectorAll('.main-panel .card, .main-panel .section-header, .main-panel .chart-card');
+    targets.forEach((node) => {
+      node.classList.add('scroll-reveal');
+    });
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '0px 0px -20% 0px',
+      }
+    );
+
+    targets.forEach((node) => observer.observe(node));
+
+    return () => observer.disconnect();
+  }, [activeView, employees.length, projects.length, taskBoardProjects.length, analyticsPeriod]);
 
   useEffect(() => {
     const assigned = (taskBoardProjects || [])
@@ -827,19 +879,39 @@ const App = () => {
     <div className="app-shell">
       <Sidebar activeView={activeView} onSelect={setActiveView} />
       <main className="main-panel">
-        <div className="topbar">
+        <div className="topbar page-enter">
           <div>
             <p className="eyebrow">Manager Workspace</p>
-            <h2 className="page-title">{activeView.replace('-', ' ')}</h2>
+            <h2 className="page-title page-title-animate">{activeView.replace('-', ' ')}</h2>
           </div>
           <div className="topbar-meta">
+            <div className="ui-live-indicator" aria-label="Animated interface status">
+              <span className="ui-live-dot" />
+              <span className="ui-live-track">
+                <span className="ui-live-wave" />
+              </span>
+              <span className="ui-live-label">Interface Live</span>
+            </div>
             <span>{employees.filter((employee) => !employee.is_outreach).length} employees</span>
             <span>{projects.length} projects</span>
             <span>{tools.length} tools</span>
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
+              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            >
+              <span className={theme === 'light' ? 'theme-toggle-icon sun' : 'theme-toggle-icon moon'}>
+                {theme === 'light' ? '☀️' : '🌙'}
+              </span>
+              <span>{theme === 'light' ? 'Light' : 'Dark'}</span>
+            </button>
           </div>
         </div>
         {error && activeView !== 'mission-control' ? <div className="error-box">{error}</div> : null}
-        {renderContent()}
+        <div key={activeView} className="page-enter row-cascade">
+          {renderContent()}
+        </div>
 
         {addMemberTarget ? (
           <div className="modal-backdrop" role="dialog" aria-modal="true">

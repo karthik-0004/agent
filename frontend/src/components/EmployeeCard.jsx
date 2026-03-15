@@ -28,12 +28,13 @@ const sourceBadge = (employee) => {
   return null;
 };
 
-const EmployeeCard = ({ employee, isAssigned, onEdit, onDelete }) => {
+const EmployeeCard = ({ employee, isAssigned, onEdit, onDelete, style }) => {
   const rating = computeRating(employee);
   const skills = splitSkills(employee.skills).slice(0, 8);
+  const statusClass = isAssigned ? 'status-assigned' : 'status-available';
 
   return (
-    <div className="card dataset-card hover-lift">
+    <div className={`card dataset-card employee-card hover-lift ${statusClass}`} style={style}>
       <div className="section-header compact">
         <div>
           <p className="section-title small">{employee.is_outreach ? '🌐 ' : ''}{employee.name}</p>
@@ -42,7 +43,7 @@ const EmployeeCard = ({ employee, isAssigned, onEdit, onDelete }) => {
             📧 {employee.email || 'N/A'}
           </p>
         </div>
-        <span className="rating-badge">{rating}/10</span>
+        <span className="rating-badge" style={{ '--rating-scale': rating / 10 }}>{rating}/10</span>
       </div>
 
       <div className="chip-row dense">
@@ -59,7 +60,7 @@ const EmployeeCard = ({ employee, isAssigned, onEdit, onDelete }) => {
 
       <div className="chip-row dense">
         {skills.map((skill) => (
-          <span key={`${employee.name}-${skill}`} className="chip neutral">
+          <span key={`${employee.name}-${skill}`} className="chip neutral entering">
             {skill}
           </span>
         ))}

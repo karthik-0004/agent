@@ -43,8 +43,8 @@ const EmployeeDirectory = ({ employees, assignedNames, onEdit, onDelete }) => {
         />
       </div>
 
-      <div className="employee-directory-grid">
-        {pageSlice.map((employee) => {
+      <div className="employee-directory-grid stagger-grid">
+        {pageSlice.map((employee, index) => {
           const isAssigned = assignedNames.has(employee.name);
 
           return (
@@ -54,6 +54,7 @@ const EmployeeDirectory = ({ employees, assignedNames, onEdit, onDelete }) => {
               isAssigned={isAssigned}
               onEdit={onEdit}
               onDelete={onDelete}
+              style={{ '--stagger-index': index }}
             />
           );
         })}

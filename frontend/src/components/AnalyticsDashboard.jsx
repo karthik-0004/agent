@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -13,6 +14,28 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+
+const useCountUp = (target, duration = 900) => {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    const safeTarget = Number(target || 0);
+    let rafId = 0;
+    const start = performance.now();
+    const tick = (time) => {
+      const elapsed = Math.min(1, (time - start) / duration);
+      const eased = 1 - Math.pow(1 - elapsed, 3);
+      setValue(Math.round(safeTarget * eased));
+      if (elapsed < 1) {
+        rafId = window.requestAnimationFrame(tick);
+      }
+    };
+    rafId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(rafId);
+  }, [target, duration]);
+
+  return value;
+};
 
 const STATUS_COLORS = {
   Ongoing: '#16a34a',
@@ -64,6 +87,30 @@ const AnalyticsDashboard = ({
   onLeaderboardSort,
   onViewFullTeam,
 }) => {
+  const topStats = data?.top_stats || {};
+  const charts = data?.charts || {};
+  const secondary = data?.secondary_stats || {};
+  const leaderboard = data?.leaderboard || [];
+  const projectHealth = data?.project_health || [];
+  const [allowMotion, setAllowMotion] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setAllowMotion(!mediaQuery.matches);
+  }, []);
+
+  const totalProjects = useCountUp(topStats.total_projects || 0, 860);
+  const ongoingProjects = useCountUp(topStats.ongoing_projects || 0, 900);
+  const completedProjects = useCountUp(topStats.completed_projects || 0, 930);
+  const overdueProjects = useCountUp(topStats.overdue_projects || 0, 960);
+  const totalEmployees = useCountUp(secondary.total_employees || 0, 840);
+  const availableNow = useCountUp(secondary.available_now || 0, 870);
+  const toolsInUse = useCountUp(secondary.tools_in_use || 0, 900);
+  const avgRating = useCountUp(secondary.avg_team_rating || 0, 920);
+
   if (loading) {
     return (
       <div className="view-stack">
@@ -80,12 +127,6 @@ const AnalyticsDashboard = ({
     );
   }
 
-  const topStats = data?.top_stats || {};
-  const charts = data?.charts || {};
-  const secondary = data?.secondary_stats || {};
-  const leaderboard = data?.leaderboard || [];
-  const projectHealth = data?.project_health || [];
-
   const totalFromDonut = (charts.status_distribution || []).reduce((sum, row) => sum + Number(row.value || 0), 0);
 
   return (
@@ -93,21 +134,21 @@ const AnalyticsDashboard = ({
       <div className="analytics-top-grid">
         <div className="card stat-hero">
           <p className="stat-label">Total Projects</p>
-          <p className="hero-value">{topStats.total_projects || 0}</p>
+          <p className="hero-value">{totalProjects}</p>
         </div>
         <div className="card stat-hero">
           <p className="stat-label">Ongoing Projects</p>
-          <p className="hero-value">{topStats.ongoing_projects || 0}</p>
+          <p className="hero-value">{ongoingProjects}</p>
           <span className="chip green">🟢 Active</span>
         </div>
         <div className="card stat-hero">
           <p className="stat-label">Completed Projects</p>
-          <p className="hero-value">{topStats.completed_projects || 0}</p>
+          <p className="hero-value">{completedProjects}</p>
           <span className="chip blue">✅ Done</span>
         </div>
         <div className="card stat-hero">
           <p className="stat-label">Overdue Projects</p>
-          <p className="hero-value">{topStats.overdue_projects || 0}</p>
+          <p className="hero-value">{overdueProjects}</p>
           <span className="chip red">🔴 Late</span>
         </div>
       </div>
@@ -115,7 +156,7 @@ const AnalyticsDashboard = ({
       <div className="analytics-main-layout">
         <div className="analytics-left-stack">
           <div className="analytics-chart-grid">
-            <div className="card chart-card">
+            <div className="card chart-card donut-animate scroll-reveal">
               <div className="section-header compact">
                 <p className="section-title">Project Status Distribution</p>
               </div>
@@ -131,6 +172,9 @@ const AnalyticsDashboard = ({
                       paddingAngle={4}
                       cx="50%"
                       cy="46%"
+                      isAnimationActive={allowMotion}
+                      animationBegin={90}
+                      animationDuration={740}
                     >
                       {(charts.status_distribution || []).map((entry) => (
                         <Cell key={entry.name} fill={STATUS_COLORS[entry.name] || '#64748b'} />
@@ -144,7 +188,7 @@ const AnalyticsDashboard = ({
               <p className="dataset-meta">Total: {totalFromDonut}</p>
             </div>
 
-            <div className="card chart-card">
+            <div className="card chart-card scroll-reveal">
               <div className="section-header compact">
                 <p className="section-title">Team Utilization</p>
               </div>
@@ -155,7 +199,7 @@ const AnalyticsDashboard = ({
                     <XAxis dataKey="name" interval={0} angle={-25} height={70} textAnchor="end" />
                     <YAxis domain={[0, 100]} />
                     <Tooltip />
-                    <Bar dataKey="workload_percent" radius={[8, 8, 0, 0]}>
+                    <Bar dataKey="workload_percent" radius={[8, 8, 0, 0]} isAnimationActive={allowMotion} animationBegin={120} animationDuration={740}>
                       {(charts.team_utilization || []).map((row) => (
                         <Cell key={row.name} fill={workloadColor(Number(row.workload_percent || 0))} />
                       ))}
@@ -165,7 +209,7 @@ const AnalyticsDashboard = ({
               </div>
             </div>
 
-            <div className="card chart-card">
+            <div className="card chart-card line-animate scroll-reveal">
               <div className="section-header compact">
                 <p className="section-title">Task Completion Rate</p>
                 <div className="chip-row dense">
@@ -180,13 +224,22 @@ const AnalyticsDashboard = ({
                     <XAxis dataKey="date" />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="completed" stroke="#2563eb" strokeWidth={3} dot={{ r: 3 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="completed"
+                      stroke="#2563eb"
+                      strokeWidth={3}
+                      dot={{ r: 3 }}
+                      isAnimationActive={allowMotion}
+                      animationBegin={140}
+                      animationDuration={860}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="card chart-card">
+            <div className="card chart-card scroll-reveal">
               <div className="section-header compact">
                 <p className="section-title">Priority Breakdown</p>
               </div>
@@ -198,9 +251,9 @@ const AnalyticsDashboard = ({
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="high" stackId="a" fill="#dc2626" name="High" />
-                    <Bar dataKey="medium" stackId="a" fill="#f59e0b" name="Medium" />
-                    <Bar dataKey="low" stackId="a" fill="#16a34a" name="Low" />
+                    <Bar dataKey="high" stackId="a" fill="#dc2626" name="High" isAnimationActive={allowMotion} animationBegin={120} animationDuration={720} />
+                    <Bar dataKey="medium" stackId="a" fill="#f59e0b" name="Medium" isAnimationActive={allowMotion} animationBegin={150} animationDuration={720} />
+                    <Bar dataKey="low" stackId="a" fill="#16a34a" name="Low" isAnimationActive={allowMotion} animationBegin={180} animationDuration={720} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -208,10 +261,10 @@ const AnalyticsDashboard = ({
           </div>
 
           <div className="analytics-top-grid compact">
-            <div className="card stat-hero compact"><p className="stat-label">Total Employees</p><p className="hero-value small">{secondary.total_employees || 0}</p></div>
-            <div className="card stat-hero compact"><p className="stat-label">Available Right Now</p><p className="hero-value small">{secondary.available_now || 0}</p></div>
-            <div className="card stat-hero compact"><p className="stat-label">Avg Team Rating</p><p className="hero-value small">{secondary.avg_team_rating || 0}/10</p></div>
-            <div className="card stat-hero compact"><p className="stat-label">Tools In Use</p><p className="hero-value small">{secondary.tools_in_use || 0}</p></div>
+            <div className="card stat-hero compact"><p className="stat-label">Total Employees</p><p className="hero-value small">{totalEmployees}</p></div>
+            <div className="card stat-hero compact"><p className="stat-label">Available Right Now</p><p className="hero-value small">{availableNow}</p></div>
+            <div className="card stat-hero compact"><p className="stat-label">Avg Team Rating</p><p className="hero-value small">{avgRating}/10</p></div>
+            <div className="card stat-hero compact"><p className="stat-label">Tools In Use</p><p className="hero-value small">{toolsInUse}</p></div>
           </div>
 
           <div className="card">
@@ -260,7 +313,7 @@ const AnalyticsDashboard = ({
                   </div>
                   <div className="health-right">
                     <div className="bucket-progress-track wide">
-                      <div className="bucket-progress-fill" style={{ width: `${row.progress || 0}%` }} />
+                      <div className="bucket-progress-fill" style={{ '--fill-scale': (row.progress || 0) / 100 }} />
                     </div>
                     <span>{row.progress || 0}%</span>
                     <span className={healthToneClass(row.health)}>{row.health}</span>

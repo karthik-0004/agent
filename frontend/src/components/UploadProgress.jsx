@@ -22,7 +22,7 @@ const UploadProgress = ({ active, status }) => {
     <div className="card">
       <p className="section-title small">Bulk Upload in Progress</p>
       <div className="progress-track">
-        <div className="progress-fill safe" style={{ width: `${percent}%` }} />
+        <div className="progress-fill safe" style={{ '--progress-scale': percent / 100 }} />
       </div>
       <p className="dataset-meta">{percent}% complete</p>
       <div className="assignment-list">

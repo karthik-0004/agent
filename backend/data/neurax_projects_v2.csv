@@ -1,55 +1,301 @@
-project_name,description,required_skills,deadline_days,priority,source,project_id,status
-AI Sales Assistant,AI assistant that generates sales proposals automatically,"llm, nlp, apis",30,High,imported,,Open
-Healthcare Diagnosis Model,Predict early disease risk using ML models,"ml, data, analysis, python",45,High,imported,,Open
-Customer Support Chatbot,AI chatbot for customer support queries,"llm, rag, apis",25,Medium,imported,,Open
-Smart Inventory System,Automated inventory demand prediction system,"python, ml, data, engineering",40,Medium,imported,,Open
-Fraud Detection System,Real-time transaction fraud detection using ML,"ml, python, kafka, postgresql",35,High,imported,,Open
-Employee Onboarding Bot,AI assistant to guide new hires through onboarding,"llms, nlp, apis, rag",20,Medium,imported,,Open
-Supply Chain Optimizer,Predict and optimise supply chain disruptions with ML,"python, ml, data, engineering, sql",50,High,imported,,Open
-Contract Review AI,Automatically review and flag legal contracts using NLP,"nlp, llms, python, fastapi",30,High,imported,,Open
-Predictive Maintenance,Predict equipment failure before it happens using IoT data,"ml, python, time, series, kafka",45,High,imported,,Open
-Real-Time Analytics Dashboard,Live business metrics dashboard powered by streaming data,"kafka, spark, react, sql",25,Medium,imported,,Open
-Personalised Learning Engine,Recommend personalised learning paths for students using AI,"ml, nlp, python, apis",40,High,imported,,Open
-Code Review Bot,Automated AI code review and suggestion system,"llms, python, github, apis, nlp",20,Medium,imported,,Open
-Insurance Claims Processor,Automate insurance claims review and approval with AI,"ml, nlp, python, fastapi",35,High,imported,,Open
-Energy Forecasting Platform,Forecast energy demand using historical and weather data,"ml, python, time, series, sql",45,High,imported,,Open
-Multi-language Chatbot,Customer support chatbot supporting 10+ languages,"llms, nlp, translation, apis",30,Medium,imported,,Open
-Drug Interaction Checker,Flag dangerous drug interactions using NLP on clinical notes,"nlp, python, ml, postgresql",40,High,imported,,Open
-Fleet Management System,Track and optimise vehicle fleet routing in real-time,"ml, python, apis, geospatial",35,High,imported,,Open
-Smart Pricing Engine,Dynamic product pricing using demand and competitor data,"ml, python, apis, data, engineering",25,High,imported,,Open
-Talent Matching Platform,Match job candidates to roles using ML and NLP,"nlp, ml, python, fastapi",30,Medium,imported,,Open
-Document Intelligence,Extract structured data from unstructured documents,"nlp, ocr, python, llms",35,High,imported,,Open
-Churn Prediction Model,Predict customer churn before it happens using ML,"ml, python, sql, scikit-learn",25,High,imported,,Open
-AI Content Moderator,Detect harmful content in user-generated text and images,"nlp, cv, python, apis",30,High,imported,,Open
-Knowledge Graph Builder,Build and query enterprise knowledge graphs from documents,"nlp, python, graph, db, llms",50,High,imported,,Open
-Video Analytics Pipeline,Extract insights from video streams using computer vision,"cv, python, kafka, deep, learning",45,High,imported,,Open
-Loan Eligibility Scorer,Score loan applicants in real-time using ML,"ml, python, fastapi, sql",20,High,imported,,Open
-Product Recommendation API,Real-time personalised product recommendations,"ml, python, redis, apis",25,High,imported,,Open
-Sentiment Analysis Dashboard,Analyse customer sentiment from reviews and social media,"nlp, python, react, apis",20,Medium,imported,,Open
-Data Quality Monitor,Automated pipeline to detect and flag data quality issues,"python, dbt, sql, airflow",30,High,imported,,Open
-Regulatory Compliance Checker,Check documents for regulatory compliance automatically,"nlp, llms, python, fastapi",35,High,imported,,Open
-Smart Meeting Summariser,Transcribe and summarise meeting recordings with AI,"llms, nlp, apis, python",20,Medium,imported,,Open
-ESG Reporting Tool,Automate ESG report generation from raw data,"python, nlp, llms, sql",35,High,imported,,Open
-Recruitment Screener,Rank and shortlist candidates using AI from CVs,"nlp, ml, python, apis",25,Medium,imported,,Open
-Anomaly Detection System,Detect anomalies in system logs and metrics in real-time,"ml, python, kafka, elasticsearch",30,High,imported,,Open
-Patient Risk Stratifier,Stratify patient risk levels using clinical ML models,"ml, python, sql, hipaa",45,High,imported,,Open
-AI Email Composer,Generate personalised marketing emails using LLMs,"llms, python, apis, nlp",15,Medium,imported,,Open
-Sales Forecasting Engine,Forecast quarterly sales using historical CRM data,"ml, python, sql, time, series",30,High,imported,,Open
-Competitive Intelligence Bot,Monitor and summarise competitor updates automatically,"llms, nlp, web, scraping, python",25,Medium,imported,,Open
-Real Estate Valuator,Predict property values using location and market data,"ml, python, sql, apis",35,High,imported,,Open
-Automated Test Generator,Generate unit tests from source code using LLMs,"llms, python, ast, apis",20,Medium,imported,,Open
-Carbon Footprint Tracker,Track and report organisational carbon emissions,"python, sql, react, apis",30,Medium,imported,,Open
-Social Media Analytics,Track brand mentions and trends across social platforms,"nlp, python, apis, kafka",25,High,imported,,Open
-AI Grant Writer,Generate grant proposals using LLMs and project data,"llms, python, nlp, fastapi",20,Medium,imported,,Open
-Inventory Forecasting API,Predict stock levels and trigger reorders automatically,"ml, python, fastapi, sql",30,High,imported,,Open
-Voice-to-Insight System,Convert voice recordings to structured business insights,"nlp, asr, llms, python",40,High,imported,,Open
-Multi-Modal Search Engine,"Search across text, image and video using AI embeddings","cv, nlp, python, vector, db",45,High,imported,,Open
-Expense Fraud Detector,Detect fraudulent expense claims using ML classification,"ml, python, sql, fastapi",25,High,imported,,Open
-Customer Journey Mapper,Map full customer journeys from multi-source event data,"python, sql, kafka, react",35,High,imported,,Open
-AI Interview Coach,Practice interviews with AI and receive real-time feedback,"llms, nlp, apis, react",20,Medium,imported,,Open
-Logistics Route Planner,Optimise delivery routes using AI and traffic data,"ml, python, geospatial, apis",30,High,imported,,Open
-Personalised News Feed,Curate personalised news feeds using NLP and ML,"nlp, ml, python, apis",25,Medium,imported,,Open
-Scientific Paper Summariser,Summarise research papers and extract key findings,"llms, nlp, python, fastapi",20,Medium,imported,,Open
-Portfolio Risk Analyser,Analyse investment portfolio risk using ML models,"ml, python, sql, finance, apis",35,High,imported,,Open
-Smart Home Energy Advisor,Recommend energy savings for smart home users using ML,"ml, python, iot, apis",30,Medium,imported,,Open
-Privacy Risk Assessor,Assess privacy risks in data flows and generate reports,"nlp, python, llms, sql",25,High,imported,,Open
+project_name,priority,deadline_days,required_skills,source,project_id,description,status
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+AI Sales Assistant,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Smart Inventory Prediction,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Document Summarization AI,Medium,30,,imported,,,Open
+Healthcare Diagnosis AI,Medium,30,,imported,,,Open
+Fraud Detection System,Medium,30,,imported,,,Open
+Customer Support Chatbot,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
+Autonomous AI Research Agent,Medium,30,,imported,,,Open
