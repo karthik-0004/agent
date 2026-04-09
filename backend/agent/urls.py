@@ -9,6 +9,8 @@ from .views import (
     DatasetConfirmView,
     DatasetReloadView,
     DatasetStatusView,
+    ProjectBriefPdfConfirmView,
+    ProjectBriefPdfUploadView,
     EmployeeDetailView,
     EmployeesDatasetUploadView,
     EmployeesAddOutreachView,
@@ -54,7 +56,9 @@ urlpatterns = [
     path("datasets/upload/projects/", ProjectsDatasetUploadView.as_view(), name="datasets-upload-projects"),
     path("datasets/upload/tools/", ToolsDatasetUploadView.as_view(), name="datasets-upload-tools"),
     path("datasets/upload/history/", HistoryDatasetUploadView.as_view(), name="datasets-upload-history"),
+    path("datasets/upload/projects-brief-pdf/", ProjectBriefPdfUploadView.as_view(), name="datasets-upload-projects-brief-pdf"),
     path("datasets/confirm/", DatasetConfirmView.as_view(), name="datasets-confirm"),
+    path("datasets/confirm/projects-brief-pdf/", ProjectBriefPdfConfirmView.as_view(), name="datasets-confirm-projects-brief-pdf"),
     path("datasets/status/", DatasetStatusView.as_view(), name="datasets-status"),
     path("datasets/reload/", DatasetReloadView.as_view(), name="datasets-reload"),
 ]

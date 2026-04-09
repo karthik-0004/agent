@@ -78,6 +78,15 @@ class DatasetConfirmSerializer(serializers.Serializer):
     confirm = serializers.BooleanField(required=False, default=True)
 
 
+class ProjectBriefPdfUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(required=True)
+
+
+class ProjectBriefConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    records = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+
+
 class OutreachAddSerializer(serializers.Serializer):
     name = serializers.CharField()
     role = serializers.CharField()

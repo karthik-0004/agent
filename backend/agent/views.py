@@ -15,6 +15,8 @@ from .serializers import (
     AgentRunSerializer,
     DatasetConfirmSerializer,
     DatasetUploadSerializer,
+    ProjectBriefPdfUploadSerializer,
+    ProjectBriefConfirmSerializer,
     EmployeeSerializer,
     CustomMissionSerializer,
     OutreachAddSerializer,
@@ -34,7 +36,14 @@ from .services.data_loader import (
     update_employee,
 )
 from .services.email_service import send_assignment_emails, send_outreach_assignment_email, send_outreach_farewell_email
-from .services.upload_service import confirm_bulk_rebuild, get_upload_status, parse_dataset_upload, reload_from_database_view
+from .services.upload_service import (
+    confirm_bulk_rebuild,
+    confirm_project_brief_append,
+    extract_project_brief_pdf,
+    get_upload_status,
+    parse_dataset_upload,
+    reload_from_database_view,
+)
 
 
 def _sync_employee_statuses() -> list[dict]:
@@ -492,6 +501,30 @@ class DatasetStatusView(APIView):
 class DatasetReloadView(APIView):
     def post(self, request):
         payload = reload_from_database_view()
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class ProjectBriefPdfUploadView(APIView):
+    def post(self, request):
+        serializer = ProjectBriefPdfUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        uploaded = serializer.validated_data["file"]
+        try:
+            payload = extract_project_brief_pdf(uploaded.name, uploaded.read())
+        except ValueError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class ProjectBriefPdfConfirmView(APIView):
+    def post(self, request):
+        serializer = ProjectBriefConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            payload = confirm_project_brief_append(data["token"], data.get("records") or None)
+        except ValueError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(payload, status=status.HTTP_200_OK)
 
 

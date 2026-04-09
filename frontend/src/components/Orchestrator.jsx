@@ -173,7 +173,10 @@ const Orchestrator = ({
                           className="project-dropdown-item"
                           onClick={() => handleSelectProject(project)}
                         >
-                          <span className="project-dropdown-name">{project.project_name}</span>
+                          <span>
+                            <span className="project-dropdown-name">{project.project_name}</span>
+                            {project.client_name ? <span className="project-dropdown-client">{project.client_name}</span> : null}
+                          </span>
                           <PriorityBadge priority={project.priority || 'Medium'} />
                         </button>
                       ))

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  confirmProjectBriefPdfAppend,
   confirmDatasetRebuild,
   forceDatasetReload,
   getDatasetStatus,
+  uploadProjectBriefPdf,
   uploadEmployeesDataset,
   uploadHistoryDataset,
   uploadProjectsDataset,
@@ -34,6 +36,9 @@ const DatasetManager = ({ stats }) => {
   const [uploading, setUploading] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const [pdfProcessing, setPdfProcessing] = useState(false);
+  const [pdfConfirming, setPdfConfirming] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState(null);
   const [progress, setProgress] = useState({ percent: 0 });
   const [summary, setSummary] = useState(null);
   const [status, setStatus] = useState({ pending: {}, updated_at: null, imported_records: {}, summary: {} });
@@ -111,6 +116,75 @@ const DatasetManager = ({ stats }) => {
     }
   };
 
+  const handlePdfBriefUpload = async (file) => {
+    if (!file) {
+      return;
+    }
+    setPdfProcessing(true);
+    setError('');
+    setNotice('Reading and analysing project brief...');
+    try {
+      const payload = await uploadProjectBriefPdf(file);
+      setPdfPreview(payload);
+      setNotice('PDF extraction complete. Review fields before append.');
+    } catch (requestError) {
+      setError(requestError.message);
+      setNotice('');
+    } finally {
+      setPdfProcessing(false);
+    }
+  };
+
+  const handlePdfRecordChange = (index, key, value) => {
+    setPdfPreview((previous) => {
+      if (!previous?.records) {
+        return previous;
+      }
+      const nextRecords = previous.records.map((record, rowIndex) => {
+        if (rowIndex !== index) {
+          return record;
+        }
+        return {
+          ...record,
+          [key]: key === 'deadline_days' ? Number(value || 0) : value,
+        };
+      });
+      return {
+        ...previous,
+        records: nextRecords,
+      };
+    });
+  };
+
+  const handlePdfSkillsChange = (index, value) => {
+    const skills = String(value || '')
+      .split(/[;,|]/)
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    handlePdfRecordChange(index, 'required_skills', skills);
+  };
+
+  const handleConfirmPdfAppend = async () => {
+    if (!pdfPreview?.token) {
+      return;
+    }
+    setPdfConfirming(true);
+    setError('');
+    try {
+      const payload = await confirmProjectBriefPdfAppend({
+        token: pdfPreview.token,
+        records: pdfPreview.records || [],
+      });
+      setPdfPreview(null);
+      setNotice(`Project appended and ready to plan. Added ${payload.inserted || 0}, updated ${payload.updated || 0}.`);
+      window.dispatchEvent(new CustomEvent('neurax:bulk-sync-complete', { detail: payload }));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setPdfConfirming(false);
+    }
+  };
+
   return (
     <div className="view-stack dataset-manager-page">
       <section className="card dataset-hero-card">
@@ -152,6 +226,125 @@ const DatasetManager = ({ stats }) => {
             onFile={handleFile}
           />
         ))}
+      </section>
+
+      <section className="card dataset-hero-card">
+        <div className="section-header compact">
+          <div>
+            <p className="section-title small">📄 Project Brief PDF</p>
+            <p className="section-subtitle">Upload a client brief PDF to extract and append project presets.</p>
+          </div>
+        </div>
+
+        <div className="card-actions" style={{ marginTop: 0 }}>
+          <label className="secondary-button" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            {pdfProcessing ? 'Reading and analysing document...' : 'Upload Project Brief PDF'}
+            <input
+              type="file"
+              accept=".pdf"
+              className="upload-hidden-input"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  handlePdfBriefUpload(file);
+                }
+                event.target.value = '';
+              }}
+              disabled={pdfProcessing || pdfConfirming}
+            />
+          </label>
+        </div>
+
+        {pdfPreview?.records?.length ? (
+          <div className="view-stack" style={{ marginTop: 12 }}>
+            <p className="section-title small">✅ PDF Extraction Complete</p>
+            {(pdfPreview.records || []).map((record, index) => (
+              <div key={`${record.project_id || 'project'}-${index}`} className="card" style={{ marginTop: 8 }}>
+                <div className="form-grid">
+                  <input
+                    className="search-input"
+                    value={record.project_id || ''}
+                    onChange={(event) => handlePdfRecordChange(index, 'project_id', event.target.value)}
+                    placeholder="Project ID"
+                  />
+                  <input
+                    className="search-input"
+                    value={record.project_name || ''}
+                    onChange={(event) => handlePdfRecordChange(index, 'project_name', event.target.value)}
+                    placeholder="Project Name"
+                  />
+                  <input
+                    className="search-input"
+                    value={record.client_name || ''}
+                    onChange={(event) => handlePdfRecordChange(index, 'client_name', event.target.value)}
+                    placeholder="Client Name"
+                  />
+                  <select
+                    className="search-input"
+                    value={record.priority || 'Medium'}
+                    onChange={(event) => handlePdfRecordChange(index, 'priority', event.target.value)}
+                  >
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                  <input
+                    className="search-input"
+                    type="number"
+                    min="1"
+                    value={record.deadline_days || 30}
+                    onChange={(event) => handlePdfRecordChange(index, 'deadline_days', event.target.value)}
+                    placeholder="Deadline Days"
+                  />
+                </div>
+
+                <textarea
+                  className="description-input"
+                  value={record.description || ''}
+                  onChange={(event) => handlePdfRecordChange(index, 'description', event.target.value)}
+                  placeholder="Description"
+                />
+
+                <input
+                  className="search-input"
+                  value={(record.required_skills || []).join('; ')}
+                  onChange={(event) => handlePdfSkillsChange(index, event.target.value)}
+                  placeholder="Skills separated by semicolon"
+                />
+
+                <div className="chip-row dense">
+                  {(record.required_skills || []).map((skill) => (
+                    <span key={`${record.project_id}-${skill}`} className="chip blue">{skill}</span>
+                  ))}
+                </div>
+
+                {(record.workflow_steps || []).length ? (
+                  <div className="view-stack" style={{ marginTop: 10 }}>
+                    {(record.workflow_steps || []).map((step, stepIndex) => (
+                      <p key={`${record.project_id}-step-${stepIndex}`} className="dataset-meta">
+                        → {step.step || `Step ${stepIndex + 1}`} — {step.owner_role || 'TBD'}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+
+            <div className="card-actions">
+              <button type="button" className="secondary-button" onClick={() => setPdfPreview(null)} disabled={pdfConfirming}>
+                ✏️ Edit Later
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handleConfirmPdfAppend}
+                disabled={pdfConfirming}
+              >
+                {pdfConfirming ? 'Appending...' : '✅ Confirm & Append to Projects'}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {error ? <div className="error-box">{error}</div> : null}

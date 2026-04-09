@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -15,6 +16,7 @@ from .data_loader import (
     force_reload,
     get_datasets,
     get_special_employee_names,
+    replace_dataset,
     replace_all_datasets,
 )
 
@@ -69,6 +71,7 @@ COLUMN_MAP = {
 }
 
 _PENDING_UPLOADS: dict[str, dict[str, Any]] = {}
+_PENDING_PDF_PROJECTS: dict[str, dict[str, Any]] = {}
 _LAST_STATUS: dict[str, Any] = {
     "state": "idle",
     "sync_token": 0,
@@ -361,6 +364,185 @@ def parse_dataset_upload(dataset: str, file_name: str, content: bytes) -> dict[s
         preview=preview_rows,
     )
     return preview.__dict__
+
+
+def _extract_pdf_text(content: bytes) -> str:
+    if not pdfplumber:
+        raise ValueError("pdfplumber is required to parse PDF files")
+
+    chunks: list[str] = []
+    with pdfplumber.open(BytesIO(content)) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text() or ""
+            if text.strip():
+                chunks.append(text.strip())
+    return "\n\n".join(chunks).strip()
+
+
+def _normalize_pdf_skills(value: Any) -> list[str]:
+    if isinstance(value, list):
+        raw = value
+    else:
+        raw = re.split(r"[;,|]", _as_str(value)) if _as_str(value) else []
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for item in raw:
+        token = _as_str(item).lower()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        cleaned.append(token)
+    return cleaned
+
+
+def _normalize_pdf_project_record(record: dict[str, Any], index: int = 1) -> tuple[dict[str, Any], list[str]]:
+    warnings: list[str] = []
+    project_id = _as_str(record.get("project_id")) or f"PRJ-PDF-{index:03d}"
+    project_name = _as_str(record.get("project_name")) or f"PDF Project {index}"
+    description = _as_str(record.get("description"))
+    if not description:
+        description = f"Project extracted from PDF brief for {project_name}."
+        warnings.append("description_missing")
+
+    priority = _as_str(record.get("priority"), "Medium").capitalize()
+    if priority not in {"High", "Medium", "Low"}:
+        priority = "Medium"
+        warnings.append("priority_normalized")
+
+    deadline_days = _as_int(record.get("deadline_days"), 30)
+    if deadline_days <= 0:
+        deadline_days = 30
+        warnings.append("deadline_defaulted")
+
+    skills = _normalize_pdf_skills(record.get("required_skills"))
+    if not skills:
+        warnings.append("skills_missing")
+
+    workflow_steps = record.get("workflow_steps") if isinstance(record.get("workflow_steps"), list) else []
+
+    normalized = {
+        "project_id": project_id,
+        "project_name": project_name,
+        "client_name": _as_str(record.get("client_name")),
+        "description": description,
+        "required_skills": skills,
+        "priority": priority,
+        "deadline_days": deadline_days,
+        "workflow_steps": workflow_steps,
+        "source": "pdf_import",
+    }
+    return normalized, warnings
+
+
+def extract_project_brief_pdf(file_name: str, content: bytes) -> dict[str, Any]:
+    if len(content) > MAX_FILE_SIZE:
+        raise ValueError("File too large. Max size is 50MB")
+    if not file_name.lower().endswith(".pdf"):
+        raise ValueError("Project brief upload accepts PDF files only")
+
+    brief_text = _extract_pdf_text(content)
+    if not brief_text:
+        raise ValueError("No extractable text found in PDF")
+
+    agent = AgentService()
+    extracted = agent.extract_project_brief_record(brief_text, file_name=file_name)
+    raw_projects = extracted.get("projects") if isinstance(extracted, dict) else None
+    if not isinstance(raw_projects, list) or not raw_projects:
+        raw_projects = [extracted if isinstance(extracted, dict) else {}]
+
+    normalized_records: list[dict[str, Any]] = []
+    warning_map: dict[str, list[str]] = {}
+    for index, item in enumerate(raw_projects, start=1):
+        normalized, warnings = _normalize_pdf_project_record(item if isinstance(item, dict) else {}, index=index)
+        normalized_records.append(normalized)
+        warning_map[normalized["project_id"]] = warnings
+
+    token = uuid.uuid4().hex
+    with _UPLOAD_LOCK:
+        _PENDING_PDF_PROJECTS[token] = {
+            "file_name": file_name,
+            "records": normalized_records,
+        }
+
+    return {
+        "state": "pdf_extracted",
+        "token": token,
+        "file_name": file_name,
+        "records": normalized_records,
+        "warnings": warning_map,
+    }
+
+
+def confirm_project_brief_append(token: str, records: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    with _UPLOAD_LOCK:
+        pending = _PENDING_PDF_PROJECTS.get(token)
+    if not pending:
+        raise ValueError("Invalid or expired PDF extraction token")
+
+    incoming_records = records if isinstance(records, list) and records else pending.get("records", [])
+    normalized_incoming: list[dict[str, Any]] = []
+    for index, item in enumerate(incoming_records, start=1):
+        normalized, _ = _normalize_pdf_project_record(item if isinstance(item, dict) else {}, index=index)
+        normalized_incoming.append(normalized)
+
+    existing_projects = list(get_datasets().get("projects", []))
+    project_id_to_index: dict[str, int] = {}
+    for idx, row in enumerate(existing_projects):
+        key = _as_str(row.get("project_id")).lower()
+        if key:
+            project_id_to_index[key] = idx
+
+    inserted = 0
+    updated = 0
+    for row in normalized_incoming:
+        row_payload = {
+            "project_id": row["project_id"],
+            "project_name": row["project_name"],
+            "description": row["description"],
+            "required_skills": "; ".join(row.get("required_skills", [])),
+            "deadline_days": row["deadline_days"],
+            "priority": row["priority"],
+            "client_name": row.get("client_name", ""),
+            "workflow_steps": row.get("workflow_steps", []),
+            "source": "pdf_import",
+        }
+        key = _as_str(row_payload.get("project_id")).lower()
+        if key and key in project_id_to_index:
+            existing_projects[project_id_to_index[key]] = {
+                **existing_projects[project_id_to_index[key]],
+                **row_payload,
+            }
+            updated += 1
+        else:
+            existing_projects.insert(0, row_payload)
+            project_id_to_index = {
+                _as_str(project.get("project_id")).lower(): idx
+                for idx, project in enumerate(existing_projects)
+                if _as_str(project.get("project_id"))
+            }
+            inserted += 1
+
+    replaced_projects = replace_dataset("projects", existing_projects)
+    sync_status = {
+        "state": "pdf_project_appended",
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "sync_token": int(datetime.utcnow().timestamp()),
+        "inserted": inserted,
+        "updated": updated,
+        "total_projects": len(replaced_projects),
+        "summary": {
+            "projects": len(replaced_projects),
+        },
+    }
+
+    with _UPLOAD_LOCK:
+        _PENDING_PDF_PROJECTS.pop(token, None)
+        _LAST_STATUS.update(sync_status)
+
+    return {
+        **sync_status,
+        "records": normalized_incoming,
+    }
 
 
 def _preserve_manual_employees(incoming: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:

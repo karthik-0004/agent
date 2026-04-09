@@ -95,4 +95,19 @@ export const confirmDatasetRebuild = () => request(() => api.post('/datasets/con
 export const getDatasetStatus = () => request(() => api.get('/datasets/status/'));
 export const forceDatasetReload = () => request(() => api.post('/datasets/reload/', {}));
 
+export const uploadProjectBriefPdf = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request(() =>
+    api.post('/datasets/upload/projects-brief-pdf/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  );
+};
+
+export const confirmProjectBriefPdfAppend = (payload) =>
+  request(() => api.post('/datasets/confirm/projects-brief-pdf/', payload));
+
 export default api;

@@ -219,6 +219,104 @@ class AgentService:
             "priority": priority_match.group(1).capitalize() if priority_match else "Medium",
         }
 
+    @staticmethod
+    def _extract_json_block(text: str) -> str:
+        payload = text.strip()
+        if payload.startswith("```"):
+            payload = re.sub(r"^```(?:json)?", "", payload, flags=re.IGNORECASE).strip()
+            payload = re.sub(r"```$", "", payload).strip()
+        start = payload.find("{")
+        end = payload.rfind("}")
+        if start >= 0 and end >= start:
+            return payload[start : end + 1]
+        return payload
+
+    def extract_project_brief_record(self, brief_text: str, file_name: str = "") -> dict[str, Any]:
+        system_prompt = (
+            "You read client project brief documents and return structured JSON only. "
+            "Extract one or more projects from the document body. "
+            "For each project return: project_id, project_name, client_name, description, required_skills, priority, deadline_days, workflow_steps. "
+            "description must be 1-2 concise sentences combining objective + background. "
+            "required_skills must include all explicit and implied technical skills and be deduplicated. "
+            "priority must be High, Medium, or Low inferred from urgency and business scale. "
+            "deadline_days must be an integer inferred from complexity if absent. "
+            "workflow_steps must be an array of {step, owner_role}. "
+            "Output JSON only using schema: {\"projects\":[{...}]}."
+        )
+
+        user_prompt = (
+            f"File name: {file_name or 'uploaded_project_brief.pdf'}\n"
+            "Read the entire project brief text and extract structured project records.\n"
+            "If project ID is missing, generate one like PRJ-PDF-001.\n"
+            "If no strong project split exists, return exactly one project.\n\n"
+            f"Document text:\n{brief_text[:120000]}"
+        )
+
+        if self.client:
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.MODEL_NAME,
+                    temperature=0.1,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                )
+                content = response.choices[0].message.content or "{}"
+                parsed = json.loads(self._extract_json_block(content))
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+
+        # Heuristic fallback keeps the feature usable without an API key.
+        lower_text = brief_text.lower()
+        project_id_match = re.search(r"project\s*id\s*[:#-]\s*([a-zA-Z0-9\-_/]+)", brief_text, re.IGNORECASE)
+        title_match = re.search(r"project\s*(?:title|name)\s*[:#-]\s*(.+)", brief_text, re.IGNORECASE)
+        client_match = re.search(r"client\s*(?:name)?\s*[:#-]\s*(.+)", brief_text, re.IGNORECASE)
+
+        inferred_skills = [
+            token
+            for token in [
+                "nlp", "rag", "apis", "ml", "python", "langchain", "postgresql", "react", "docker", "kubernetes",
+                "django", "node", "typescript", "aws", "azure", "gcp", "pandas", "tensorflow", "pytorch",
+            ]
+            if token in lower_text
+        ]
+        if not inferred_skills:
+            inferred_skills = ["python", "apis"]
+
+        priority = "High" if any(term in lower_text for term in ["urgent", "critical", "thousands", "high volume"]) else "Medium"
+        deadline_days = 45 if priority == "High" else 30
+        deadline_match = re.search(r"(\d+)\s*(day|days|week|weeks)", lower_text)
+        if deadline_match:
+            amount = int(deadline_match.group(1))
+            unit = deadline_match.group(2)
+            deadline_days = amount * 7 if "week" in unit else amount
+
+        description_sentences = [
+            line.strip()
+            for line in re.split(r"[\n\r]+", brief_text)
+            if line.strip() and len(line.strip()) > 20
+        ][:2]
+        description = " ".join(description_sentences)[:520] or "Client project extracted from PDF brief."
+
+        return {
+            "projects": [
+                {
+                    "project_id": project_id_match.group(1).strip() if project_id_match else "PRJ-PDF-001",
+                    "project_name": title_match.group(1).strip() if title_match else "PDF Imported Project",
+                    "client_name": client_match.group(1).strip() if client_match else "",
+                    "description": description,
+                    "required_skills": inferred_skills,
+                    "priority": priority,
+                    "deadline_days": deadline_days,
+                    "workflow_steps": [],
+                }
+            ]
+        }
+
     def calculate_performance_rating(self, employee: dict[str, Any]) -> int:
         explicit_rating = employee.get("rating")
         try:
